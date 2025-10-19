@@ -7,11 +7,14 @@ from typing import Dict, Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 
 BASE_DIR = Path(__file__).resolve().parent
 INDEX_FILE = BASE_DIR / "index.html"
+GRAPH_FILE = BASE_DIR / "graph.html"
 JSON_DATA_DIR = BASE_DIR / "json_data"
+ASSETS_DIR = BASE_DIR / "assets"
 
 
 app = FastAPI(title="JsonMaker Backend", version="1.0.0")
@@ -25,12 +28,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static files for assets
+if ASSETS_DIR.exists():
+    app.mount("/assets", StaticFiles(directory=str(ASSETS_DIR)), name="assets")
+
 
 @app.get("/")
 def serve_index() -> FileResponse:
     if not INDEX_FILE.exists():
         raise HTTPException(status_code=404, detail="index.html not found")
     return FileResponse(str(INDEX_FILE), media_type="text/html; charset=utf-8")
+
+
+@app.get("/graph")
+def serve_graph() -> FileResponse:
+    if not GRAPH_FILE.exists():
+        raise HTTPException(status_code=404, detail="graph.html not found")
+    return FileResponse(str(GRAPH_FILE), media_type="text/html; charset=utf-8")
 
 
 @app.post("/sync")
