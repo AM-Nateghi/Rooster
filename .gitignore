@@ -1,0 +1,4 @@
+.env/*
+json_data/*
+__pycache__/*
+ready_book/*

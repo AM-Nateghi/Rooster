@@ -1,0 +1,112 @@
+/* A more balanced and readable Glassmorphism */
+.glass {
+    background: rgba(255, 255, 255, 0.78);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    transition: background-color 0.3s, border-color 0.3s;
+}
+
+.dark .glass {
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-card {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    transition: all 0.2s ease-in-out;
+}
+
+.dark .glass-card {
+    background: rgba(51, 65, 85, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.selected-card {
+    transform: scale(1.03);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.7);
+}
+
+.active-tab {
+    background-color: #3b82f6;
+    /* blue-500 */
+    color: white;
+}
+
+/* Scrollbar styles for tabs */
+#tabs::-webkit-scrollbar {
+    height: 4px;
+}
+
+#tabs::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#tabs::-webkit-scrollbar-thumb {
+    background: rgba(59, 130, 246, 0.5);
+    border-radius: 2px;
+}
+
+/* Rename icon visibility on tab hover */
+.tab .tab-rename-icon {
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.tab:hover .tab-rename-icon {
+    opacity: 0.8;
+}
+
+/* General transitions for a smoother experience */
+* {
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+
+/* Light mode background polish (warmer/cream) */
+body:not(.dark) {
+    background: linear-gradient(180deg, #fff8ed 0%, #f8efe4 100%);
+}
+
+/* Light mode textarea readability */
+body:not(.dark) #inputText {
+    background: rgba(255, 252, 245, 0.95) !important;
+    color: #2b2a28 !important;
+}
+
+body:not(.dark) #inputText::placeholder {
+    color: #7a6d5a;
+}
+
+/* Warm glass surfaces in light mode */
+body:not(.dark) .glass {
+    background: rgba(255, 252, 245, 0.82);
+    border-color: rgba(125, 110, 90, 0.15);
+}
+
+body:not(.dark) .glass-card {
+    background: rgba(255, 248, 235, 0.9);
+    border-color: rgba(125, 110, 90, 0.18);
+}
+
+/* Grid card text/meta in light mode */
+body:not(.dark) .glass-card[data-id] p {
+    color: #2f2c28;
+}
+
+body:not(.dark) .glass-card[data-id] .opacity-60,
+body:not(.dark) .glass-card[data-id] .opacity-50 {
+    color: #6f6456;
+}
+
+/* Tabs in light mode */
+body:not(.dark) #tabs .tab {
+    color: #3b352d;
+}
+
+body:not(.dark) #tabs .tab.glass-card:hover {
+    background: rgba(250, 236, 217, 0.95);
+    color: #2f2b25;
+}
