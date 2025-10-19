@@ -138,6 +138,26 @@
         .dark #graph-container {
             background: rgba(15, 23, 42, 0.3);
         }
+
+        /* Light mode warm surfaces */
+        body:not(.dark) .glass {
+            background: rgba(255, 252, 245, 0.82);
+            border-color: rgba(125, 110, 90, 0.15);
+        }
+
+        body:not(.dark) .glass-card {
+            background: rgba(255, 248, 235, 0.9);
+            border-color: rgba(125, 110, 90, 0.18);
+        }
+
+        /* Light mode text colors */
+        body:not(.dark) .book-item {
+            color: #2f2c28;
+        }
+
+        body:not(.dark) #bookList h3 {
+            color: #3b352d;
+        }
     </style>
 </head>
 
@@ -167,13 +187,12 @@
 
             <!-- Sidebar -->
             <aside class="w-72 flex flex-col gap-4 overflow-y-auto">
-                <!-- File Upload -->
+                <!-- Refresh Button -->
                 <section class="glass rounded-xl p-4 shadow-md">
-                    <label for="fileInput"
-                        class="flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 active:scale-95 cursor-pointer">
-                        <span>📂</span> بارگذاری فایل JSON
-                    </label>
-                    <input type="file" id="fileInput" accept=".json" class="hidden">
+                    <button id="refreshData"
+                        class="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 active:scale-95">
+                        <span>🔄</span> <span>بارگذاری مجدد داده‌ها</span>
+                    </button>
                 </section>
 
                 <!-- Stats -->
@@ -192,22 +211,22 @@
 
                 <!-- Toggle Link Mode -->
                 <section class="glass rounded-xl p-4 shadow-md">
-                    <div class="flex items-center justify-between">
-                        <span class="text-sm font-medium">حالت اتصال یال</span>
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-slate-800 dark:text-slate-200">حالت اتصال یال</span>
                         <button id="linkToggle"
                             class="relative w-12 h-6 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors">
                             <span
                                 class="absolute top-1 right-1 w-4 h-4 bg-white rounded-full transition-transform duration-200"></span>
                         </button>
                     </div>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    <p class="text-xs text-gray-600 dark:text-gray-400">
                         روشن: برای ایجاد یال، دو نود را انتخاب کنید
                     </p>
                 </section>
 
                 <!-- Books List -->
                 <section class="glass rounded-xl p-4 shadow-md flex-1 overflow-y-auto">
-                    <h3 class="text-sm font-bold mb-3 text-slate-700 dark:text-slate-200">📚 کتاب‌ها</h3>
+                    <h3 class="text-sm font-bold mb-3 text-slate-800 dark:text-slate-200">📚 کتاب‌ها</h3>
                     <div id="bookList" class="space-y-2"></div>
                 </section>
             </aside>
@@ -222,8 +241,9 @@
                     <div id="emptyState" class="absolute inset-0 flex items-center justify-center">
                         <div class="text-center">
                             <p class="text-6xl mb-4">🔍</p>
-                            <p class="text-lg text-gray-500 dark:text-gray-400">هنوز داده‌ای بارگذاری نشده است</p>
-                            <p class="text-sm text-gray-400 dark:text-gray-500 mt-2">یک فایل JSON انتخاب کنید</p>
+                            <p class="text-lg text-gray-600 dark:text-gray-400">هنوز داده‌ای بارگذاری نشده است</p>
+                            <p class="text-sm text-gray-500 dark:text-gray-500 mt-2">از صفحه اصلی چانک‌های خود را اضافه
+                                کنید</p>
                         </div>
                     </div>
                 </div>
@@ -231,7 +251,7 @@
                 <!-- Detail Panel -->
                 <div id="detailPanel" class="glass rounded-xl p-4 shadow-md hidden max-h-64 overflow-y-auto">
                     <div class="flex justify-between items-start mb-3">
-                        <h3 class="text-lg font-bold text-slate-700 dark:text-slate-200" id="detailTitle">جزئیات</h3>
+                        <h3 class="text-lg font-bold text-slate-800 dark:text-slate-200" id="detailTitle">جزئیات</h3>
                         <button id="closeDetail" class="text-red-500 hover:text-red-600 text-xl font-bold leading-none">
                             ✕
                         </button>
@@ -246,7 +266,7 @@
     <script>
         // Global state
         let graphData = { nodes: [], links: [] };
-        let allData = {};
+        let entriesByTopic = {};
         let currentBook = null;
         let linkModeEnabled = false;
         let selectedNodeForLink = null;
@@ -326,47 +346,45 @@
             .attr('d', 'M0,-5L10,0L0,5')
             .attr('fill', d => linkTypes[d]?.color || linkTypes.default.color);
 
-        // Load data from file
-        $('#fileInput').on('change', function (e) {
-            const file = e.target.files[0];
-            if (!file) return;
+        // Load data from localStorage
+        function loadDataFromStorage() {
+            try {
+                const storedData = localStorage.getItem("entriesByTopic");
+                if (storedData) {
+                    entriesByTopic = JSON.parse(storedData);
+                    if (Object.keys(entriesByTopic).length > 0) {
+                        renderBookList();
 
-            const reader = new FileReader();
-            reader.onload = function (event) {
-                try {
-                    const data = JSON.parse(event.target.result);
-                    processData(data);
-                } catch (err) {
-                    alert('خطا در خواندن فایل JSON');
-                    console.error(err);
+                        // Select first book by default
+                        const firstBook = Object.keys(entriesByTopic)[0];
+                        if (firstBook) {
+                            selectBook(firstBook);
+                        }
+
+                        $('#emptyState').hide();
+                    } else {
+                        $('#emptyState').show();
+                    }
+                } else {
+                    $('#emptyState').show();
                 }
-            };
-            reader.readAsText(file);
-        });
-
-        function processData(data) {
-            allData = data.entriesByTopic || {};
-            renderBookList();
-
-            // Select first book by default
-            const firstBook = Object.keys(allData)[0];
-            if (firstBook) {
-                selectBook(firstBook);
+            } catch (err) {
+                console.error('خطا در خواندن داده‌ها از localStorage:', err);
+                alert('خطا در بارگذاری داده‌ها');
+                $('#emptyState').show();
             }
-
-            $('#emptyState').hide();
         }
 
         function renderBookList() {
             const $bookList = $('#bookList');
             $bookList.empty();
 
-            Object.keys(allData).forEach(book => {
-                const count = allData[book].length;
+            Object.keys(entriesByTopic).forEach(book => {
+                const count = entriesByTopic[book].length;
                 const $item = $(`
                     <div class="book-item glass-card p-3 rounded-lg cursor-pointer hover:shadow-lg" data-book="${book}">
                         <div class="flex justify-between items-center">
-                            <span class="font-medium text-sm">${book}</span>
+                            <span class="font-medium text-sm text-slate-800 dark:text-slate-200">${book}</span>
                             <span class="text-xs px-2 py-0.5 rounded-full bg-blue-500 text-white">${count}</span>
                         </div>
                     </div>
@@ -388,7 +406,7 @@
             $(`.book-item[data-book="${book}"]`).addClass('ring-2 ring-blue-500');
 
             // Transform data to graph format
-            const entries = allData[book] || [];
+            const entries = entriesByTopic[book] || [];
             graphData.nodes = entries.map(e => ({
                 id: e.id,
                 title: e.input.slice(0, 50) + (e.input.length > 50 ? '...' : ''),
@@ -543,20 +561,20 @@
             $('#detailTitle').text('جزئیات نود');
             $('#detailContent').html(`
                 <div>
-                    <div class="font-semibold text-gray-600 dark:text-gray-400">شناسه:</div>
-                    <div class="text-gray-800 dark:text-gray-200">${node.id}</div>
+                    <div class="font-semibold text-gray-700 dark:text-gray-400">شناسه:</div>
+                    <div class="text-gray-900 dark:text-gray-200">${node.id}</div>
                 </div>
                 <div>
-                    <div class="font-semibold text-gray-600 dark:text-gray-400">نوع:</div>
-                    <div class="text-gray-800 dark:text-gray-200">${node.type}</div>
+                    <div class="font-semibold text-gray-700 dark:text-gray-400">نوع:</div>
+                    <div class="text-gray-900 dark:text-gray-200">${node.type}</div>
                 </div>
                 <div>
-                    <div class="font-semibold text-gray-600 dark:text-gray-400">ترتیب:</div>
-                    <div class="text-gray-800 dark:text-gray-200">#${node.order}</div>
+                    <div class="font-semibold text-gray-700 dark:text-gray-400">ترتیب:</div>
+                    <div class="text-gray-900 dark:text-gray-200">#${node.order}</div>
                 </div>
                 <div>
-                    <div class="font-semibold text-gray-600 dark:text-gray-400">متن کامل:</div>
-                    <div class="text-gray-800 dark:text-gray-200 leading-relaxed">${node.fullText}</div>
+                    <div class="font-semibold text-gray-700 dark:text-gray-400">متن کامل:</div>
+                    <div class="text-gray-900 dark:text-gray-200 leading-relaxed">${node.fullText}</div>
                 </div>
             `);
             $('#detailPanel').removeClass('hidden').addClass('block');
@@ -569,16 +587,16 @@
             $('#detailTitle').text('جزئیات یال');
             $('#detailContent').html(`
                 <div>
-                    <div class="font-semibold text-gray-600 dark:text-gray-400">نوع:</div>
-                    <div class="text-gray-800 dark:text-gray-200">${link.type}</div>
+                    <div class="font-semibold text-gray-700 dark:text-gray-400">نوع:</div>
+                    <div class="text-gray-900 dark:text-gray-200">${link.type}</div>
                 </div>
                 <div>
-                    <div class="font-semibold text-gray-600 dark:text-gray-400">از نود:</div>
-                    <div class="text-gray-800 dark:text-gray-200">${sourceNode?.title || 'نامشخص'}</div>
+                    <div class="font-semibold text-gray-700 dark:text-gray-400">از نود:</div>
+                    <div class="text-gray-900 dark:text-gray-200">${sourceNode?.title || 'نامشخص'}</div>
                 </div>
                 <div>
-                    <div class="font-semibold text-gray-600 dark:text-gray-400">به نود:</div>
-                    <div class="text-gray-800 dark:text-gray-200">${targetNode?.title || 'نامشخص'}</div>
+                    <div class="font-semibold text-gray-700 dark:text-gray-400">به نود:</div>
+                    <div class="text-gray-900 dark:text-gray-200">${targetNode?.title || 'نامشخص'}</div>
                 </div>
             `);
             $('#detailPanel').removeClass('hidden').addClass('block');
@@ -595,14 +613,18 @@
 
             if (linkModeEnabled) {
                 $toggle.removeClass('bg-slate-300 dark:bg-slate-600').addClass('bg-blue-500');
-                $dot.addClass('-translate-x-6');
+                $dot.addClass('translate-x-6');
             } else {
                 $toggle.removeClass('bg-blue-500').addClass('bg-slate-300 dark:bg-slate-600');
-                $dot.removeClass('-translate-x-6');
+                $dot.removeClass('translate-x-6');
             }
 
             selectedNodeForLink = null;
             d3.selectAll('.node').classed('selected', false);
+        });
+
+        $('#refreshData').on('click', function () {
+            loadDataFromStorage();
         });
 
         // Drag functions
@@ -634,6 +656,7 @@
 
         // Initialize
         initializeTheme();
+        loadDataFromStorage();
     </script>
 </body>
 
