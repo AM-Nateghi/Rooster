@@ -8,6 +8,7 @@ let currentDocId = null;
 let linkModeEnabled = false;
 let selectedNodeForLink = null;
 let simulation = null;
+let nodePositions = {}; // Store node positions to preserve them between renders
 
 // Theme initialization
 function initializeTheme() {
@@ -31,10 +32,11 @@ $("#darkToggle").on("click", function () {
 // Link type configurations
 const linkTypes = {
     reference: { color: '#3b82f6', directed: true, width: 2 },
-    'نتیجه‌گیری': { color: '#8b5cf6', directed: true, width: 2.5 },
+    'ارتباط علی': { color: '#8b5cf6', directed: true, width: 2.5 },
     'ادامه متن': { color: '#06b6d4', directed: true, width: 2 },
     'مثال': { color: '#10b981', directed: false, width: 2 },
     'بیشتر بدانیم': { color: '#f59e0b', directed: false, width: 2 },
+    'زیرمجموعه مطلب': { color: '#ec4899', directed: true, width: 2.5 },
     default: { color: '#64748b', directed: true, width: 1.5 }
 };
 
@@ -122,18 +124,20 @@ svg.call(zoom);
 
 // Arrow markers for directed edges
 svg.append('defs').selectAll('marker')
-    .data(Object.keys(linkTypes))
+    .data(Object.keys(linkTypes).filter(k => linkTypes[k].directed))
     .enter().append('marker')
     .attr('id', d => `arrow-${d}`)
-    .attr('viewBox', '0 -5 10 10')
-    .attr('refX', 20)
+    .attr('viewBox', '0 -8 16 16')
+    .attr('refX', 28)  // node radius (14) + stroke (2) + arrow width (12)
     .attr('refY', 0)
-    .attr('markerWidth', 6)
-    .attr('markerHeight', 6)
+    .attr('markerWidth', 12)
+    .attr('markerHeight', 12)
     .attr('orient', 'auto')
     .append('path')
-    .attr('d', 'M0,-5L10,0L0,5')
-    .attr('fill', d => linkTypes[d]?.color || linkTypes.default.color);
+    .attr('d', 'M0,-8L16,0L0,8L4,0Z')  // بزرگتر و واضح‌تر
+    .attr('fill', d => linkTypes[d]?.color || linkTypes.default.color)
+    .style('stroke', 'none')
+    .style('opacity', '1');
 
 // Load data from localStorage
 function loadDataFromStorage() {
@@ -220,11 +224,13 @@ function selectBook(book) {
     // Load real connections from localStorage (NO MORE DEMO LINKS!)
     graphData.links = [];
     if (currentDocId) {
-        const connections = loadConnections(currentDocId);
         const nodeIds = graphData.nodes.map(n => n.id);
 
-        // Validate and load connections
+        // Validate connections (removes invalid ones)
         validateConnections(currentDocId, nodeIds);
+
+        // Reload validated connections
+        const connections = loadConnections(currentDocId);
 
         // Convert connections to link format
         graphData.links = connections.map(conn => ({
@@ -235,6 +241,12 @@ function selectBook(book) {
             createdAt: conn.createdAt,
             userDefined: conn.userDefined
         }));
+
+        // Warn about cleaned connections
+        const cleanedCount = connections.length - graphData.links.length;
+        if (cleanedCount > 0) {
+            console.warn(`⚠️ Removed ${cleanedCount} invalid connection(s) with missing nodes`);
+        }
     }
 
     updateStats();
@@ -247,6 +259,15 @@ function updateStats() {
 }
 
 function renderGraph() {
+    // Stop previous simulation if it exists
+    if (simulation) {
+        // Save current positions before stopping
+        simulation.nodes().forEach(n => {
+            nodePositions[n.id] = { x: n.x, y: n.y, vx: n.vx, vy: n.vy };
+        });
+        simulation.stop();
+    }
+
     g.selectAll('*').remove();
     $('#detailPanel').hide();
     selectedNodeForLink = null;
@@ -255,21 +276,53 @@ function renderGraph() {
 
     const { width, height } = getGraphDimensions();
 
-    // Create force simulation
-    simulation = d3.forceSimulation(graphData.nodes)
+    // Create fresh copy of nodes, preserving positions if they exist
+    const nodes = graphData.nodes.map(n => {
+        const saved = nodePositions[n.id];
+        return {
+            ...n,
+            x: saved?.x || width / 2 + (Math.random() - 0.5) * 100,
+            y: saved?.y || height / 2 + (Math.random() - 0.5) * 100,
+            vx: saved?.vx || 0,
+            vy: saved?.vy || 0
+        };
+    });
+
+    // Create force simulation optimized for clustered graphs
+    simulation = d3.forceSimulation(nodes)
         .force('link', d3.forceLink(graphData.links)
             .id(d => d.id)
-            .distance(100))
-        .force('charge', d3.forceManyBody().strength(-300))
-        .force('center', d3.forceCenter(width / 2, height / 2))
-        .force('collision', d3.forceCollide().radius(35));
+            .distance(100)  // کلاسترها فشرده‌تر
+            .strength(0.7))  // کشش قوی‌تر برای نگه داشتن کلاسترها
+        .force('charge', d3.forceManyBody()
+            .strength(-1200)  // دفع خیلی قوی برای جدا نگه داشتن نودها
+            .distanceMax(500)  // محدوده تاثیر بزرگتر
+            .theta(0.8))  // دقت بیشتر در محاسبات
+        .force('center', d3.forceCenter(width / 2, height / 2)
+            .strength(0.02))  // کشش خیلی ضعیف به مرکز
+        .force('collision', d3.forceCollide()
+            .radius(60)  // حباب برخورد خیلی بزرگ
+            .strength(1)  // قدرت برخورد حداکثر
+            .iterations(3))  // چند بار چک کردن برخورد
+        .force('x', d3.forceX(width / 2).strength(0.005))
+        .force('y', d3.forceY(height / 2).strength(0.005))
+        .alphaDecay(0.01)  // خیلی کند آروم میشه
+        .velocityDecay(0.4);  // اصطکاک متوسط
+
+    // If was frozen, stop immediately
+    if (isFrozen) {
+        simulation.stop();
+    }
 
     // Draw links
     const link = g.append('g')
         .selectAll('line')
         .data(graphData.links)
         .enter().append('line')
-        .attr('class', 'link')
+        .attr('class', d => {
+            const config = linkTypes[d.type] || linkTypes.default;
+            return config.directed ? 'link' : 'link undirected';
+        })
         .attr('stroke', d => {
             const config = linkTypes[d.type] || linkTypes.default;
             return config.color;
@@ -287,7 +340,7 @@ function renderGraph() {
     // Draw nodes
     const node = g.append('g')
         .selectAll('g')
-        .data(graphData.nodes)
+        .data(nodes)
         .enter().append('g')
         .attr('class', 'node')
         .call(d3.drag()
@@ -312,12 +365,12 @@ function renderGraph() {
     // Update positions on tick
     simulation.on('tick', () => {
         link
-            .attr('x1', d => d.source.x)
-            .attr('y1', d => d.source.y)
-            .attr('x2', d => d.target.x)
-            .attr('y2', d => d.target.y);
+            .attr('x1', d => d.source.x || 0)
+            .attr('y1', d => d.source.y || 0)
+            .attr('x2', d => d.target.x || 0)
+            .attr('y2', d => d.target.y || 0);
 
-        node.attr('transform', d => `translate(${d.x},${d.y})`);
+        node.attr('transform', d => `translate(${d.x || 0},${d.y || 0})`);
     });
 }
 
@@ -381,19 +434,41 @@ function createConnection(sourceId, targetId, type) {
         return;
     }
 
+    // Verify both nodes exist
+    const sourceNode = graphData.nodes.find(n => n.id === sourceId);
+    const targetNode = graphData.nodes.find(n => n.id === targetId);
+
+    if (!sourceNode || !targetNode) {
+        alert('خطا: یکی از نودها یافت نشد. لطفا صفحه را بارگذاری مجدد کنید.');
+        console.error('Missing nodes:', { sourceId, targetId, sourceNode, targetNode });
+        return;
+    }
+
+    // Save connection to localStorage
     const connection = saveConnection(currentDocId, sourceId, targetId, type);
 
-    graphData.links.push({
-        id: connection.id,
-        source: sourceId,
-        target: targetId,
-        type: type,
-        createdAt: connection.createdAt,
-        userDefined: true
-    });
+    // Reload connections from localStorage to ensure consistency
+    const connections = loadConnections(currentDocId);
+
+    // Rebuild links array from scratch
+    graphData.links = connections.map(conn => ({
+        id: conn.id,
+        source: conn.source,  // Keep as ID string, D3 will convert it
+        target: conn.target,  // Keep as ID string, D3 will convert it
+        type: conn.type,
+        createdAt: conn.createdAt,
+        userDefined: conn.userDefined
+    }));
 
     updateStats();
+
+    // Re-render with minimal disruption
     renderGraph();
+
+    // Reduce alpha to minimize movement after adding link
+    if (simulation) {
+        simulation.alpha(0.3).restart();
+    }
 }
 
 $('#cancelLinkType').on('click', function() {
@@ -428,12 +503,16 @@ function showNodeDetail(node) {
                     <div class="text-gray-900 dark:text-gray-200 leading-relaxed">${node.fullText}</div>
                 </div>
             `);
-    $('#detailPanel').removeClass('hidden').addClass('block');
+    $('#detailPanel').show();
 }
 
 function showLinkDetail(link) {
-    const sourceNode = graphData.nodes.find(n => n.id === link.source.id);
-    const targetNode = graphData.nodes.find(n => n.id === link.target.id);
+    // Handle both cases: before and after D3 processes the link
+    const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+    const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+
+    const sourceNode = graphData.nodes.find(n => n.id === sourceId);
+    const targetNode = graphData.nodes.find(n => n.id === targetId);
     const linkConfig = linkTypes[link.type] || linkTypes.default;
 
     const createdDate = link.createdAt ? new Date(link.createdAt).toLocaleString('fa-IR') : 'نامشخص';
@@ -476,7 +555,7 @@ function showLinkDetail(link) {
                 </div>
                 ${deleteButton}
             `);
-    $('#detailPanel').removeClass('hidden').addClass('block');
+    $('#detailPanel').show();
 }
 
 // Handle delete link button click
@@ -485,11 +564,22 @@ $(document).on('click', '#deleteLinkBtn', function() {
     if (!confirm('آیا از حذف این یال مطمئن هستید؟')) return;
 
     if (deleteConnection(currentDocId, linkId)) {
-        // Remove from graphData
-        graphData.links = graphData.links.filter(l => l.id !== linkId);
+        // Reload connections from localStorage
+        const connections = loadConnections(currentDocId);
+
+        // Rebuild links array from scratch
+        graphData.links = connections.map(conn => ({
+            id: conn.id,
+            source: conn.source,
+            target: conn.target,
+            type: conn.type,
+            createdAt: conn.createdAt,
+            userDefined: conn.userDefined
+        }));
+
         updateStats();
         renderGraph();
-        $('#detailPanel').addClass('hidden');
+        $('#detailPanel').hide();
         alert('یال با موفقیت حذف شد');
     } else {
         alert('خطا در حذف یال');
@@ -497,7 +587,7 @@ $(document).on('click', '#deleteLinkBtn', function() {
 });
 
 $('#closeDetail').on('click', function () {
-    $('#detailPanel').addClass('hidden').removeClass('block');
+    $('#detailPanel').hide();
 });
 
 $('#linkToggle').on('click', function () {
@@ -519,6 +609,25 @@ $('#linkToggle').on('click', function () {
 
 $('#refreshData').on('click', function () {
     loadDataFromStorage();
+});
+
+// Freeze/unfreeze simulation
+let isFrozen = false;
+$('#freezeToggle').on('click', function() {
+    isFrozen = !isFrozen;
+    const $btn = $(this);
+
+    if (isFrozen) {
+        if (simulation) {
+            simulation.stop();
+        }
+        $btn.text('🔥 آزاد کردن').removeClass('bg-purple-500 hover:bg-purple-600').addClass('bg-orange-500 hover:bg-orange-600');
+    } else {
+        if (simulation) {
+            simulation.alpha(0.3).restart();
+        }
+        $btn.text('❄️ ثابت کردن').removeClass('bg-orange-500 hover:bg-orange-600').addClass('bg-purple-500 hover:bg-purple-600');
+    }
 });
 
 // Sync graph data with backend
