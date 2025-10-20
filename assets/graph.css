@@ -1,0 +1,162 @@
+/* Glassmorphism styles matching original design */
+.glass {
+    background: rgba(255, 255, 255, 0.78);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    transition: background-color 0.3s, border-color 0.3s;
+}
+
+.dark .glass {
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-card {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    transition: all 0.2s ease-in-out;
+}
+
+.dark .glass-card {
+    background: rgba(51, 65, 85, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Light mode background polish (warmer/cream) */
+body:not(.dark) {
+    background: linear-gradient(180deg, #fff8ed 0%, #f8efe4 100%);
+}
+
+body.dark {
+    background: #0f172a;
+}
+
+/* General transitions for a smoother experience */
+* {
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s;
+}
+
+/* Node and link styles */
+.node {
+    cursor: pointer;
+}
+
+.node circle {
+    stroke: #fff;
+    stroke-width: 2px;
+    transition: all 0.2s;
+}
+
+.node:hover circle {
+    stroke-width: 4px;
+    filter: brightness(1.1);
+}
+
+.node.selected circle {
+    stroke: #ef4444;
+    stroke-width: 4px;
+}
+
+.link {
+    stroke-opacity: 0.6;
+    transition: all 0.2s;
+}
+
+.link:hover {
+    stroke-opacity: 1;
+    stroke-width: 3px !important;
+    cursor: pointer;
+}
+
+.link.selected {
+    stroke: #ef4444;
+    stroke-opacity: 1;
+    stroke-width: 3px !important;
+}
+
+.node-label {
+    font-size: 10px;
+    font-weight: 600;
+    pointer-events: none;
+    text-anchor: middle;
+    fill: #334155;
+    text-shadow: 0 0 3px white, 0 0 3px white;
+}
+
+.dark .node-label {
+    fill: #e2e8f0;
+    text-shadow: 0 0 3px #0f172a, 0 0 3px #0f172a;
+}
+
+/* Book item hover effect */
+.book-item {
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.book-item:hover {
+    transform: translateX(-3px);
+}
+
+/* Scrollbar matching original */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 4px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(59, 130, 246, 0.5);
+    border-radius: 2px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+    background: rgba(59, 130, 246, 0.4);
+}
+
+/* Graph container */
+#graph-container {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.dark #graph-container {
+    background: rgba(15, 23, 42, 0.3);
+}
+
+/* Light mode warm surfaces */
+body:not(.dark) .glass {
+    background: rgba(255, 252, 245, 0.82);
+    border-color: rgba(125, 110, 90, 0.15);
+}
+
+body:not(.dark) .glass-card {
+    background: rgba(255, 248, 235, 0.9);
+    border-color: rgba(125, 110, 90, 0.18);
+}
+
+/* Light mode text colors */
+body:not(.dark) .book-item {
+    color: #2f2c28;
+}
+
+body:not(.dark) #bookList h3 {
+    color: #3b352d;
+}
+
+/* Fix light mode text visibility */
+body:not(.dark) h1 {
+    color: #1e293b !important;
+}
+
+body:not(.dark) .text-slate-800 {
+    color: #1e293b !important;
+}
+
+body:not(.dark) .book-item span {
+    color: #334155 !important;
+}
