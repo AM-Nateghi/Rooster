@@ -70,7 +70,11 @@ body.dark {
     stroke-opacity: 1;
     stroke-width: 4px !important;
     cursor: pointer;
-    filter: drop-shadow(0 0 4px currentColor);
+    filter: drop-shadow(0 0 6px currentColor);
+}
+
+.dark .link:hover {
+    filter: drop-shadow(0 0 3px currentColor);
 }
 
 .link.selected {
@@ -166,4 +170,34 @@ body:not(.dark) .text-slate-800 {
 
 body:not(.dark) .book-item span {
     color: #334155 !important;
+}
+
+/* Detail Tooltip Styles */
+#detailTooltip {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+.dark #detailTooltip {
+    background: rgba(30, 41, 59, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+#detailTooltip .font-semibold {
+    color: #64748b;
+}
+
+.dark #detailTooltip .font-semibold {
+    color: #94a3b8;
+}
+
+#detailTooltip .text-gray-900 {
+    color: #1e293b;
+}
+
+.dark #detailTooltip .text-gray-900 {
+    color: #e2e8f0;
 }

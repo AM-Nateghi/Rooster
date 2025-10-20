@@ -9,6 +9,7 @@ let linkModeEnabled = false;
 let selectedNodeForLink = null;
 let simulation = null;
 let nodePositions = {}; // Store node positions to preserve them between renders
+let hoverTimer = null; // Timer for showing tooltip on hover
 
 // Theme initialization
 function initializeTheme() {
@@ -29,15 +30,15 @@ $("#darkToggle").on("click", function () {
     localStorage.setItem("isDark", isDark);
 });
 
-// Link type configurations
+// Link type configurations with unique 4-digit IDs starting from 3141
 const linkTypes = {
-    reference: { color: '#3b82f6', directed: true, width: 2 },
-    'ارتباط علی': { color: '#8b5cf6', directed: true, width: 2.5 },
-    'ادامه متن': { color: '#06b6d4', directed: true, width: 2 },
-    'مثال': { color: '#10b981', directed: false, width: 2 },
-    'بیشتر بدانیم': { color: '#f59e0b', directed: false, width: 2 },
-    'زیرمجموعه مطلب': { color: '#ec4899', directed: true, width: 2.5 },
-    default: { color: '#64748b', directed: true, width: 1.5 }
+    reference: { id: 3141, color: '#3b82f6', directed: true, width: 2 },
+    'ارتباط علی': { id: 3142, color: '#8b5cf6', directed: true, width: 2.5 },
+    'ادامه متن': { id: 3143, color: '#06b6d4', directed: true, width: 2 },
+    'مثال': { id: 3144, color: '#10b981', directed: false, width: 2 },
+    'بیشتر بدانیم': { id: 3145, color: '#f59e0b', directed: false, width: 2 },
+    'زیرمجموعه مطلب': { id: 3146, color: '#ec4899', directed: true, width: 2.5 },
+    default: { id: 3147, color: '#64748b', directed: true, width: 1.5 }
 };
 
 // Node type colors
@@ -122,22 +123,27 @@ const zoom = d3.zoom()
 
 svg.call(zoom);
 
-// Arrow markers for directed edges
+// Arrow markers for directed edges using numeric IDs
+const linkTypeMapping = {};
 svg.append('defs').selectAll('marker')
     .data(Object.keys(linkTypes).filter(k => linkTypes[k].directed))
     .enter().append('marker')
-    .attr('id', d => `arrow-${d}`)
-    .attr('viewBox', '0 -8 16 16')
-    .attr('refX', 28)  // node radius (14) + stroke (2) + arrow width (12)
+    .attr('id', d => {
+        const config = linkTypes[d] || linkTypes.default;
+        const markerId = `arrow-${config.id}`;
+        linkTypeMapping[d] = markerId; // Store mapping original -> numeric ID
+        return markerId;
+    })
+    .attr('viewBox', '0 -5 10 10')
+    .attr('refX', 18)  // node radius (14) + stroke (2) + arrow tip (2)
     .attr('refY', 0)
-    .attr('markerWidth', 12)
-    .attr('markerHeight', 12)
+    .attr('markerWidth', 6)
+    .attr('markerHeight', 6)
     .attr('orient', 'auto')
     .append('path')
-    .attr('d', 'M0,-8L16,0L0,8L4,0Z')  // بزرگتر و واضح‌تر
+    .attr('d', 'M0,-4L8,0L0,4L2,0Z')  // فلش کوچکتر و دقیق‌تر
     .attr('fill', d => linkTypes[d]?.color || linkTypes.default.color)
-    .style('stroke', 'none')
-    .style('opacity', '1');
+    .style('stroke', 'none');
 
 // Load data from localStorage
 function loadDataFromStorage() {
@@ -269,7 +275,7 @@ function renderGraph() {
     }
 
     g.selectAll('*').remove();
-    $('#detailPanel').hide();
+    $('#detailTooltip').addClass('hidden');
     selectedNodeForLink = null;
 
     if (!graphData.nodes.length) return;
@@ -333,9 +339,31 @@ function renderGraph() {
         })
         .attr('marker-end', d => {
             const config = linkTypes[d.type] || linkTypes.default;
-            return config.directed ? `url(#arrow-${d.type})` : null;
+            if (!config.directed) return null;
+
+            // Use numeric marker ID (e.g., arrow-3141, arrow-3142, ...)
+            const markerId = linkTypeMapping[d.type] || `arrow-${config.id}`;
+            return `url(#${markerId})`;
         })
-        .on('click', handleLinkClick);
+        .on('click', handleLinkClick)
+        .on('mouseenter', function(event, d) {
+            if (linkModeEnabled) return;
+
+            // Clear any existing timer
+            if (hoverTimer) clearTimeout(hoverTimer);
+
+            // Show tooltip after 0.8s
+            hoverTimer = setTimeout(() => {
+                showLinkDetail(d, event);
+            }, 800);
+        })
+        .on('mouseleave', function() {
+            // Clear timer if mouse leaves before timeout
+            if (hoverTimer) {
+                clearTimeout(hoverTimer);
+                hoverTimer = null;
+            }
+        });
 
     // Draw nodes
     const node = g.append('g')
@@ -358,9 +386,25 @@ function renderGraph() {
         .attr('dy', -20)
         .text(d => d.title.slice(0, 15));
 
-    // Add tooltips
-    node.append('title')
-        .text(d => d.title);
+    // Add hover handlers
+    node.on('mouseenter', function(event, d) {
+        if (linkModeEnabled) return;
+
+        // Clear any existing timer
+        if (hoverTimer) clearTimeout(hoverTimer);
+
+        // Show tooltip after 0.8s
+        hoverTimer = setTimeout(() => {
+            showNodeDetail(d, event);
+        }, 800);
+    })
+    .on('mouseleave', function() {
+        // Clear timer if mouse leaves before timeout
+        if (hoverTimer) {
+            clearTimeout(hoverTimer);
+            hoverTimer = null;
+        }
+    });
 
     // Update positions on tick
     simulation.on('tick', () => {
@@ -390,8 +434,8 @@ function handleNodeClick(event, d) {
         d3.selectAll('.node').classed('selected', false);
         d3.select(event.currentTarget).classed('selected', true);
     } else {
-        // Show detail panel
-        showNodeDetail(d);
+        // Show tooltip immediately on click
+        showNodeDetail(d, event);
     }
 }
 
@@ -479,34 +523,40 @@ function handleLinkClick(event, d) {
     event.stopPropagation();
 
     if (!linkModeEnabled) {
-        showLinkDetail(d);
+        showLinkDetail(d, event);
     }
 }
 
-function showNodeDetail(node) {
+function showNodeDetail(node, event) {
+    const $tooltip = $('#detailTooltip');
+
     $('#detailTitle').text('جزئیات نود');
     $('#detailContent').html(`
-                <div>
-                    <div class="font-semibold text-gray-700 dark:text-gray-400">شناسه:</div>
-                    <div class="text-gray-900 dark:text-gray-200">${node.id}</div>
-                </div>
-                <div>
-                    <div class="font-semibold text-gray-700 dark:text-gray-400">نوع:</div>
-                    <div class="text-gray-900 dark:text-gray-200">${node.type}</div>
-                </div>
-                <div>
-                    <div class="font-semibold text-gray-700 dark:text-gray-400">ترتیب:</div>
-                    <div class="text-gray-900 dark:text-gray-200">#${node.order}</div>
-                </div>
-                <div>
-                    <div class="font-semibold text-gray-700 dark:text-gray-400">متن کامل:</div>
-                    <div class="text-gray-900 dark:text-gray-200 leading-relaxed">${node.fullText}</div>
-                </div>
-            `);
-    $('#detailPanel').show();
+        <div>
+            <div class="font-semibold">شناسه:</div>
+            <div class="text-gray-900">${node.id}</div>
+        </div>
+        <div>
+            <div class="font-semibold">نوع:</div>
+            <div class="text-gray-900">${node.type}</div>
+        </div>
+        <div>
+            <div class="font-semibold">ترتیب:</div>
+            <div class="text-gray-900">#${node.order}</div>
+        </div>
+        <div>
+            <div class="font-semibold">متن کامل:</div>
+            <div class="text-gray-900 leading-relaxed">${node.fullText}</div>
+        </div>
+    `);
+
+    // Position tooltip near the mouse cursor
+    positionTooltip($tooltip, event);
+
+    $tooltip.removeClass('hidden');
 }
 
-function showLinkDetail(link) {
+function showLinkDetail(link, event) {
     // Handle both cases: before and after D3 processes the link
     const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
     const targetId = typeof link.target === 'object' ? link.target.id : link.target;
@@ -521,45 +571,91 @@ function showLinkDetail(link) {
     if (link.userDefined && link.id) {
         deleteButton = `
             <button id="deleteLinkBtn" data-link-id="${link.id}"
-                class="w-full mt-3 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 active:scale-95 transition-all">
-                🗑️ حذف این یال
+                class="inline-block px-3 py-1 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600 active:scale-95 transition-all float-left">
+                🗑️ حذف
             </button>
         `;
     }
 
+    const $tooltip = $('#detailTooltip');
+
     $('#detailTitle').text('جزئیات یال');
     $('#detailContent').html(`
-                <div>
-                    <div class="font-semibold text-gray-700 dark:text-gray-400">نوع:</div>
-                    <div class="flex items-center gap-2">
-                        <div class="w-3 h-3 rounded-full" style="background: ${linkConfig.color};"></div>
-                        <span class="text-gray-900 dark:text-gray-200">${link.type}</span>
-                        <span class="text-xs text-gray-600 dark:text-gray-400">${linkConfig.directed ? '(جهت‌دار →)' : '(دوطرفه ↔)'}</span>
-                    </div>
-                </div>
-                <div>
-                    <div class="font-semibold text-gray-700 dark:text-gray-400">از نود:</div>
-                    <div class="text-gray-900 dark:text-gray-200">${sourceNode?.title || 'نامشخص'}</div>
-                </div>
-                <div>
-                    <div class="font-semibold text-gray-700 dark:text-gray-400">به نود:</div>
-                    <div class="text-gray-900 dark:text-gray-200">${targetNode?.title || 'نامشخص'}</div>
-                </div>
-                <div>
-                    <div class="font-semibold text-gray-700 dark:text-gray-400">تاریخ ایجاد:</div>
-                    <div class="text-gray-900 dark:text-gray-200">${createdDate}</div>
-                </div>
-                <div>
-                    <div class="font-semibold text-gray-700 dark:text-gray-400">وضعیت:</div>
-                    <div class="text-gray-900 dark:text-gray-200">${link.userDefined ? '✅ ایجاد شده توسط کاربر' : '🤖 پیش‌فرض سیستم'}</div>
-                </div>
-                ${deleteButton}
-            `);
-    $('#detailPanel').show();
+        <div>
+            <div class="font-semibold">نوع:</div>
+            <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full" style="background: ${linkConfig.color};"></div>
+                <span class="text-gray-900">${link.type}</span>
+                <span class="text-xs text-gray-600 dark:text-gray-400">${linkConfig.directed ? '(جهت‌دار →)' : '(دوطرفه ↔)'}</span>
+            </div>
+        </div>
+        <div>
+            <div class="font-semibold">از نود:</div>
+            <div class="text-gray-900">${sourceNode?.title || 'نامشخص'}</div>
+        </div>
+        <div>
+            <div class="font-semibold">به نود:</div>
+            <div class="text-gray-900">${targetNode?.title || 'نامشخص'}</div>
+        </div>
+        <div>
+            <div class="font-semibold">تاریخ ایجاد:</div>
+            <div class="text-gray-900">${createdDate}</div>
+        </div>
+        <div>
+            <div class="font-semibold">وضعیت:</div>
+            <div class="text-gray-900">${link.userDefined ? '✅ ایجاد شده توسط کاربر' : '🤖 پیش‌فرض سیستم'}</div>
+        </div>
+        <div class="mt-3 clearfix">
+            ${deleteButton}
+        </div>
+    `);
+
+    // Position tooltip near the mouse cursor
+    positionTooltip($tooltip, event);
+
+    $tooltip.removeClass('hidden');
+}
+
+// Helper function to position tooltip near cursor
+function positionTooltip($tooltip, event) {
+    const mouseX = event.pageX || event.clientX;
+    const mouseY = event.pageY || event.clientY;
+    const offset = 15;
+
+    // Get tooltip dimensions
+    $tooltip.removeClass('hidden');
+    const tooltipWidth = $tooltip.outerWidth();
+    const tooltipHeight = $tooltip.outerHeight();
+
+    // Get viewport dimensions
+    const viewportWidth = $(window).width();
+    const viewportHeight = $(window).height();
+
+    // Calculate position (default: right and below cursor)
+    let left = mouseX + offset;
+    let top = mouseY + offset;
+
+    // Adjust if tooltip goes off-screen to the right
+    if (left + tooltipWidth > viewportWidth - 20) {
+        left = mouseX - tooltipWidth - offset;
+    }
+
+    // Adjust if tooltip goes off-screen to the bottom
+    if (top + tooltipHeight > viewportHeight - 20) {
+        top = mouseY - tooltipHeight - offset;
+    }
+
+    // Ensure tooltip doesn't go off-screen to the left or top
+    left = Math.max(10, left);
+    top = Math.max(10, top);
+
+    $tooltip.css({ left: `${left}px`, top: `${top}px` });
 }
 
 // Handle delete link button click
-$(document).on('click', '#deleteLinkBtn', function() {
+$(document).on('click', '#deleteLinkBtn', function(e) {
+    e.stopPropagation();
+
     const linkId = $(this).data('link-id');
     if (!confirm('آیا از حذف این یال مطمئن هستید؟')) return;
 
@@ -579,15 +675,26 @@ $(document).on('click', '#deleteLinkBtn', function() {
 
         updateStats();
         renderGraph();
-        $('#detailPanel').hide();
+        $('#detailTooltip').addClass('hidden');
         alert('یال با موفقیت حذف شد');
     } else {
         alert('خطا در حذف یال');
     }
 });
 
-$('#closeDetail').on('click', function () {
-    $('#detailPanel').hide();
+// Click outside tooltip to close
+$(document).on('click', function(e) {
+    const $tooltip = $('#detailTooltip');
+
+    // If tooltip is visible and click is outside tooltip
+    if (!$tooltip.hasClass('hidden') && !$tooltip.is(e.target) && $tooltip.has(e.target).length === 0) {
+        $tooltip.addClass('hidden');
+    }
+});
+
+// Prevent tooltip clicks from closing it
+$('#detailTooltip').on('click', function(e) {
+    e.stopPropagation();
 });
 
 $('#linkToggle').on('click', function () {

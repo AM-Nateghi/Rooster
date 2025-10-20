@@ -110,20 +110,19 @@
                     </div>
                 </div>
 
-                <!-- Detail Panel -->
-                <div id="detailPanel" class="glass rounded-xl p-4 shadow-md hidden max-h-64 overflow-y-auto">
-                    <div class="flex justify-between items-start mb-3">
-                        <h3 class="text-lg font-bold text-slate-800 dark:text-slate-200" id="detailTitle">جزئیات</h3>
-                        <button id="closeDetail" class="text-red-500 hover:text-red-600 text-xl font-bold leading-none">
-                            ✕
-                        </button>
-                    </div>
-                    <div id="detailContent" class="space-y-3 text-sm"></div>
-                </div>
             </section>
 
         </div>
     </main>
+
+    <!-- Detail Tooltip (Floating) -->
+    <div id="detailTooltip"
+         class="hidden fixed z-50 rounded-xl p-4 shadow-2xl max-w-sm max-h-96 overflow-y-auto"
+         style="backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+                background: rgba(255, 255, 255, 0.85); border: 1px solid rgba(15, 23, 42, 0.1);">
+        <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200 mb-3" id="detailTitle">جزئیات</h3>
+        <div id="detailContent" class="space-y-2 text-xs"></div>
+    </div>
 
     <!-- Link Type Dropdown Modal -->
     <div id="linkTypeModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
