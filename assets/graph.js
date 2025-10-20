@@ -179,7 +179,7 @@ function loadDataFromStorage() {
         }
     } catch (err) {
         console.error('خطا در خواندن داده‌ها از localStorage:', err);
-        alert('خطا در بارگذاری داده‌ها');
+        toast.error('خطا در بارگذاری داده‌ها');
         $('#emptyState').show();
     }
 }
@@ -474,7 +474,7 @@ function showLinkTypeModal(sourceNode, targetNode) {
 
 function createConnection(sourceId, targetId, type) {
     if (!currentDocId) {
-        alert('خطا: شناسه کتاب یافت نشد');
+        toast.error('خطا: شناسه کتاب یافت نشد');
         return;
     }
 
@@ -483,7 +483,7 @@ function createConnection(sourceId, targetId, type) {
     const targetNode = graphData.nodes.find(n => n.id === targetId);
 
     if (!sourceNode || !targetNode) {
-        alert('خطا: یکی از نودها یافت نشد. لطفا صفحه را بارگذاری مجدد کنید.');
+        toast.error('خطا: یکی از نودها یافت نشد. لطفا صفحه را بارگذاری مجدد کنید.');
         console.error('Missing nodes:', { sourceId, targetId, sourceNode, targetNode });
         return;
     }
@@ -668,11 +668,11 @@ function positionTooltip($tooltip, event) {
 }
 
 // Handle delete link button click
-$(document).on('click', '.deleteLinkBtn', function (e) {
+$(document).on('click', '.deleteLinkBtn', async function (e) {
     e.stopPropagation();
 
     const linkId = $(this).data('link-id');
-    if (!confirm('آیا از حذف این یال مطمئن هستید؟')) return;
+    if (!await modal.confirm('آیا از حذف این یال مطمئن هستید؟', { title: 'تایید حذف یال' })) return;
 
     if (deleteConnection(currentDocId, linkId)) {
         // Reload connections from localStorage
@@ -691,9 +691,9 @@ $(document).on('click', '.deleteLinkBtn', function (e) {
         updateStats();
         renderGraph();
         $('#detailTooltip').addClass('hidden');
-        alert('یال با موفقیت حذف شد');
+        toast.success('یال با موفقیت حذف شد');
     } else {
-        alert('خطا در حذف یال');
+        toast.error('خطا در حذف یال');
     }
 });
 
@@ -704,13 +704,13 @@ $(document).on('click', '.reverseLinkBtn', function (e) {
     const linkId = $(this).data('link-id');
 
     if (!currentDocId) {
-        alert('خطا: شناسه کتاب یافت نشد');
+        toast.error('خطا: شناسه کتاب یافت نشد');
         return;
     }
 
     // Find the connection in graphConnections
     if (!graphConnections[currentDocId]) {
-        alert('خطا: اتصالات یافت نشد');
+        toast.error('خطا: اتصالات یافت نشد');
         return;
     }
 
@@ -719,7 +719,7 @@ $(document).on('click', '.reverseLinkBtn', function (e) {
     if (connectionIndex === -1) {
         console.error('❌ Connection not found with ID:', linkId);
         console.log('Available connection IDs:', graphConnections[currentDocId].map(c => c.id));
-        alert('خطا: یال یافت نشد');
+        toast.error('خطا: یال یافت نشد');
         return;
     }
 
@@ -756,7 +756,7 @@ $(document).on('click', '.reverseLinkBtn', function (e) {
         simulation.alpha(0.3).restart();
     }
 
-    alert('جهت یال با موفقیت برعکس شد');
+    toast.success('جهت یال با موفقیت برعکس شد');
 });
 
 // Click outside tooltip to close
@@ -842,7 +842,7 @@ $('#syncGraph').on('click', async function () {
         setTimeout(() => { $text.text('همگام‌سازی گراف'); }, 1500);
     } catch (e) {
         console.error(e);
-        alert('خطا در همگام‌سازی با بک‌اند');
+        toast.error('خطا در همگام‌سازی با بک‌اند');
         $text.text('خطا ❌');
         setTimeout(() => { $text.text('همگام‌سازی گراف'); }, 1500);
     } finally {

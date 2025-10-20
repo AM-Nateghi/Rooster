@@ -193,7 +193,7 @@ $(function () {
 
     $("#addBtn").on("click", function () {
         const text = $("#inputText").val().trim();
-        if (!text) return alert("لطفاً متنی وارد کنید!");
+        if (!text) return toast.warning("لطفاً متنی وارد کنید!");
         if (!orderCounters[currentTopic]) orderCounters[currentTopic] = 0;
         if (!entriesByTopic[currentTopic]) entriesByTopic[currentTopic] = [];
 
@@ -214,7 +214,7 @@ $(function () {
     $("#updateBtn").on("click", function () {
         if (!selectedId) return;
         const text = $("#inputText").val().trim();
-        if (!text) return alert("متن نمی‌تواند خالی باشد!");
+        if (!text) return toast.warning("متن نمی‌تواند خالی باشد!");
         const idx = entriesByTopic[currentTopic].findIndex(e => e.id === selectedId);
         if (idx > -1) {
             entriesByTopic[currentTopic][idx].input = text;
@@ -224,8 +224,9 @@ $(function () {
         reset(); // Reset selection after update
     });
 
-    $("#deleteBtn").on("click", function () {
-        if (!selectedId || !confirm("آیا از حذف این آیتم مطمئن هستید؟")) return;
+    $("#deleteBtn").on("click", async function () {
+        if (!selectedId) return;
+        if (!await modal.confirm("آیا از حذف این آیتم مطمئن هستید؟", { title: "تایید حذف" })) return;
         entriesByTopic[currentTopic] = entriesByTopic[currentTopic].filter(e => e.id !== selectedId);
         saveToStorage();
         reset();
@@ -258,12 +259,12 @@ $(function () {
         renderTabs();
     });
 
-    $(document).on("click", ".tab-rename-icon", function (e) {
+    $(document).on("click", ".tab-rename-icon", async function (e) {
         e.stopPropagation();
         const oldTopic = $(this).closest(".tab").data("topic");
-        const newName = prompt("نام جدید برای موضوع:", oldTopic);
+        const newName = await modal.prompt("نام جدید برای موضوع:", { defaultValue: oldTopic, title: "تغییر نام موضوع" });
         if (newName && newName.trim() && newName !== oldTopic) {
-            if (entriesByTopic[newName]) return alert("این نام قبلاً استفاده شده است!");
+            if (entriesByTopic[newName]) return toast.warning("این نام قبلاً استفاده شده است!");
 
             // Atomically update data
             Object.defineProperty(entriesByTopic, newName, Object.getOwnPropertyDescriptor(entriesByTopic, oldTopic));
@@ -294,11 +295,11 @@ $(function () {
         }
     });
 
-    $(document).on("click", ".tab-delete-icon", function (e) {
+    $(document).on("click", ".tab-delete-icon", async function (e) {
         e.stopPropagation();
         const topic = $(this).closest(".tab").data("topic");
         if (!topic) return;
-        if (!confirm(`آیا از حذف موضوع "${topic}" مطمئن هستید؟ این عملیات غیرقابل بازگشت است.`)) return;
+        if (!await modal.confirm(`آیا از حذف موضوع "${topic}" مطمئن هستید؟ این عملیات غیرقابل بازگشت است.`, { title: "تایید حذف موضوع" })) return;
         // Delete topic data
         delete entriesByTopic[topic];
         if (orderCounters[topic] !== undefined) delete orderCounters[topic];
@@ -324,10 +325,10 @@ $(function () {
         render();
     });
 
-    $(document).on("click", "#addTopic", function () {
-        const name = prompt("نام موضوع/کتاب جدید:");
+    $(document).on("click", "#addTopic", async function () {
+        const name = await modal.prompt("نام موضوع/کتاب جدید:", { title: "ایجاد موضوع جدید" });
         if (name && name.trim()) {
-            if (entriesByTopic[name]) return alert("این نام قبلاً استفاده شده است!");
+            if (entriesByTopic[name]) return toast.warning("این نام قبلاً استفاده شده است!");
             entriesByTopic[name] = [];
             currentTopic = name;
             booksMeta[name] = {
@@ -450,7 +451,7 @@ $(function () {
             setTimeout(() => { $text.text("سینک با بک‌اند"); }, 1500);
         } catch (e) {
             console.error(e);
-            alert("خطا در سینک با بک‌اند");
+            toast.error("خطا در سینک با بک‌اند");
             $text.text("خطا ❌");
             setTimeout(() => { $text.text("سینک با بک‌اند"); }, 1500);
         } finally {
@@ -491,7 +492,7 @@ $(function () {
             setTimeout(() => { $text.text("بازیابی از بک‌اند"); }, 1500);
         } catch (e) {
             console.error(e);
-            alert("خطا در بازیابی از بک‌اند");
+            toast.error("خطا در بازیابی از بک‌اند");
             $text.text("خطا ❌");
             setTimeout(() => { $text.text("بازیابی از بک‌اند"); }, 1500);
         } finally {
@@ -502,6 +503,43 @@ $(function () {
     }
 
     $("#restoreBtn").on("click", restoreFromBackend);
+
+    async function createBackup() {
+        const $btn = $("#backupBtn");
+        const $icon = $btn.find(".backup-icon");
+        const $text = $btn.find(".backup-text");
+        const $spinner = $btn.find(".backup-spinner");
+
+        $btn.prop("disabled", true).addClass("opacity-70 cursor-not-allowed");
+        $spinner.removeClass("hidden");
+        $icon.addClass("hidden");
+        $text.text("در حال بک‌آپ...");
+
+        try {
+            const res = await fetch("http://localhost:8000/backup", {
+                method: "POST"
+            });
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.detail || "Backup failed");
+            }
+            const data = await res.json();
+            toast.success(data.message || "بک‌آپ با موفقیت ایجاد شد");
+            $text.text("بک‌آپ شد ✅");
+            setTimeout(() => { $text.text("بک‌آپ گرفتن"); }, 1500);
+        } catch (e) {
+            console.error(e);
+            toast.error(e.message || "خطا در ایجاد بک‌آپ");
+            $text.text("خطا ❌");
+            setTimeout(() => { $text.text("بک‌آپ گرفتن"); }, 1500);
+        } finally {
+            $btn.prop("disabled", false).removeClass("opacity-70 cursor-not-allowed");
+            $spinner.addClass("hidden");
+            $icon.removeClass("hidden");
+        }
+    }
+
+    $("#backupBtn").on("click", createBackup);
 
     // Import from file (JSON)
     const fileInput = $('<input type="file" id="importFile" accept="application/json" class="hidden" />');
@@ -537,10 +575,10 @@ $(function () {
                 saveToStorage();
                 renderTabs();
                 render();
-                alert("ایمپورت با موفقیت انجام شد.");
+                toast.success("ایمپورت با موفقیت انجام شد.");
             } catch (err) {
                 console.error(err);
-                alert("فایل نامعتبر است.");
+                toast.error("فایل نامعتبر است.");
             } finally {
                 fileInput.val("");
             }
