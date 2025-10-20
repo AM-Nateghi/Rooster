@@ -708,31 +708,32 @@ $(document).on('click', '#reverseLinkBtn', function(e) {
         return;
     }
 
-    // Find the connection in localStorage
-    const connections = graphConnections[currentDocId];
-    if (!connections) {
+    // Find the connection in graphConnections
+    if (!graphConnections[currentDocId]) {
         alert('خطا: اتصالات یافت نشد');
         return;
     }
 
-    const connectionIndex = connections.findIndex(c => c.id === linkId);
+    const connectionIndex = graphConnections[currentDocId].findIndex(c => c.id === linkId);
     if (connectionIndex === -1) {
         alert('خطا: یال یافت نشد');
         return;
     }
 
     // Reverse source and target
-    const connection = connections[connectionIndex];
+    const connection = graphConnections[currentDocId][connectionIndex];
     const tempSource = connection.source;
     connection.source = connection.target;
     connection.target = tempSource;
 
+    // Update graphConnections global variable
+    graphConnections[currentDocId][connectionIndex] = connection;
+
     // Save to localStorage
     localStorage.setItem("graphConnections", JSON.stringify(graphConnections));
 
-    // Reload connections and rebuild graph
-    const updatedConnections = loadConnections(currentDocId);
-    graphData.links = updatedConnections.map(conn => ({
+    // Rebuild links array from updated graphConnections
+    graphData.links = graphConnections[currentDocId].map(conn => ({
         id: conn.id,
         source: conn.source,
         target: conn.target,
@@ -742,8 +743,15 @@ $(document).on('click', '#reverseLinkBtn', function(e) {
     }));
 
     updateStats();
+
+    // Re-render with minimal disruption
     renderGraph();
-    $('#detailTooltip').addClass('hidden');
+
+    // Reduce alpha to minimize movement
+    if (simulation) {
+        simulation.alpha(0.3).restart();
+    }
+
     alert('جهت یال با موفقیت برعکس شد');
 });
 
