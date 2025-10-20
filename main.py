@@ -14,6 +14,7 @@ BASE_DIR = Path(__file__).resolve().parent
 INDEX_FILE = BASE_DIR / "index.html"
 GRAPH_FILE = BASE_DIR / "graph.html"
 JSON_DATA_DIR = BASE_DIR / "json_data"
+GRAPH_DATA_DIR = JSON_DATA_DIR / "graph"
 ASSETS_DIR = BASE_DIR / "assets"
 
 
@@ -108,7 +109,8 @@ def restore_data() -> Dict[str, Any]:
 
     entries_by_topic: Dict[str, Any] = {}
     for path in JSON_DATA_DIR.glob("*.json"):
-        if path.name == "manifest.json":
+        # Skip manifest and graph_data (graph_data should be in graph/ folder now)
+        if path.name in ("manifest.json", "graph_data.json"):
             continue
         topic_name = path.stem.replace("_", " ")
         try:
@@ -159,10 +161,11 @@ def sync_graph_data(payload: Dict[str, Any]) -> Dict[str, Any]:
             status_code=400, detail="booksMeta is required and must be an object"
         )
 
-    JSON_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    # Create graph directory if it doesn't exist
+    GRAPH_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Save graph connections
-    graph_data_path = JSON_DATA_DIR / "graph_data.json"
+    # Save graph connections to graph/graph_data.json
+    graph_data_path = GRAPH_DATA_DIR / "graph_data.json"
     graph_data = {
         "booksMeta": books_meta,
         "graphConnections": graph_connections or {},
@@ -178,9 +181,9 @@ def sync_graph_data(payload: Dict[str, Any]) -> Dict[str, Any]:
 def restore_graph_data() -> Dict[str, Any]:
     """Return saved graph connections and books metadata.
 
-    Returns booksMeta and graphConnections from graph_data.json if it exists.
+    Returns booksMeta and graphConnections from graph/graph_data.json if it exists.
     """
-    graph_data_path = JSON_DATA_DIR / "graph_data.json"
+    graph_data_path = GRAPH_DATA_DIR / "graph_data.json"
 
     if not graph_data_path.exists():
         return {"booksMeta": {}, "graphConnections": {}}

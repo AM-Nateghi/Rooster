@@ -530,6 +530,12 @@ function handleLinkClick(event, d) {
 function showNodeDetail(node, event) {
     const $tooltip = $('#detailTooltip');
 
+    // Truncate text to 500 characters
+    const maxLength = 500;
+    const displayText = node.fullText.length > maxLength
+        ? node.fullText.substring(0, maxLength) + '...'
+        : node.fullText;
+
     $('#detailTitle').text('جزئیات نود');
     $('#detailContent').html(`
         <div>
@@ -545,8 +551,8 @@ function showNodeDetail(node, event) {
             <div class="text-gray-900">#${node.order}</div>
         </div>
         <div>
-            <div class="font-semibold">متن کامل:</div>
-            <div class="text-gray-900 leading-relaxed">${node.fullText}</div>
+            <div class="font-semibold">خلاصه متن:</div>
+            <div class="text-gray-900 leading-relaxed text-justify">${displayText}</div>
         </div>
     `);
 
@@ -567,13 +573,22 @@ function showLinkDetail(link, event) {
 
     const createdDate = link.createdAt ? new Date(link.createdAt).toLocaleString('fa-IR') : 'نامشخص';
 
-    let deleteButton = '';
+    let actionButtons = '';
     if (link.userDefined && link.id) {
-        deleteButton = `
+        // Add reverse button for directed links
+        const reverseButton = linkConfig.directed ? `
+            <button id="reverseLinkBtn" data-link-id="${link.id}"
+                class="inline-block px-3 py-1 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 active:scale-95 transition-all float-right mr-2">
+                🔄 برعکس کردن
+            </button>
+        ` : '';
+
+        actionButtons = `
             <button id="deleteLinkBtn" data-link-id="${link.id}"
                 class="inline-block px-3 py-1 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600 active:scale-95 transition-all float-left">
                 🗑️ حذف
             </button>
+            ${reverseButton}
         `;
     }
 
@@ -606,7 +621,7 @@ function showLinkDetail(link, event) {
             <div class="text-gray-900">${link.userDefined ? '✅ ایجاد شده توسط کاربر' : '🤖 پیش‌فرض سیستم'}</div>
         </div>
         <div class="mt-3 clearfix">
-            ${deleteButton}
+            ${actionButtons}
         </div>
     `);
 
@@ -680,6 +695,56 @@ $(document).on('click', '#deleteLinkBtn', function(e) {
     } else {
         alert('خطا در حذف یال');
     }
+});
+
+// Handle reverse link button click
+$(document).on('click', '#reverseLinkBtn', function(e) {
+    e.stopPropagation();
+
+    const linkId = $(this).data('link-id');
+
+    if (!currentDocId) {
+        alert('خطا: شناسه کتاب یافت نشد');
+        return;
+    }
+
+    // Find the connection in localStorage
+    const connections = graphConnections[currentDocId];
+    if (!connections) {
+        alert('خطا: اتصالات یافت نشد');
+        return;
+    }
+
+    const connectionIndex = connections.findIndex(c => c.id === linkId);
+    if (connectionIndex === -1) {
+        alert('خطا: یال یافت نشد');
+        return;
+    }
+
+    // Reverse source and target
+    const connection = connections[connectionIndex];
+    const tempSource = connection.source;
+    connection.source = connection.target;
+    connection.target = tempSource;
+
+    // Save to localStorage
+    localStorage.setItem("graphConnections", JSON.stringify(graphConnections));
+
+    // Reload connections and rebuild graph
+    const updatedConnections = loadConnections(currentDocId);
+    graphData.links = updatedConnections.map(conn => ({
+        id: conn.id,
+        source: conn.source,
+        target: conn.target,
+        type: conn.type,
+        createdAt: conn.createdAt,
+        userDefined: conn.userDefined
+    }));
+
+    updateStats();
+    renderGraph();
+    $('#detailTooltip').addClass('hidden');
+    alert('جهت یال با موفقیت برعکس شد');
 });
 
 // Click outside tooltip to close
