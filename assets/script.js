@@ -435,52 +435,82 @@ $(function () {
         $modal.on('click', '.modal-cancel, [data-modal-backdrop]', cleanup);
 
         // Confirm and export
-        $modal.on('click', '.modal-confirm', function () {
+        $modal.on('click', '.modal-confirm', async function () {
             const selectedTopics = $modal.find('.export-chip.active').map(function () {
                 return $(this).data('topic');
             }).get();
 
             const finalTopics = selectedTopics.length ? selectedTopics : topics;
-            const filteredEntries = Object.fromEntries(finalTopics.map(t => [t, entriesByTopic[t] || []]));
-            const filteredOrder = Object.fromEntries(finalTopics.map(t => [t, orderCounters[t] || 0]));
-            const filteredMeta = Object.fromEntries(finalTopics.map(t => [t, booksMeta[t] || { id: randomDocId(), name: t, created: Date.now() }]));
-            const filename = `dataset-${finalTopics.length === 1 ? finalTopics[0] : 'multi'}-${new Date().toISOString().slice(0, 10)}.json`;
-            const json = JSON.stringify({ entriesByTopic: filteredEntries, orderCounters: filteredOrder, currentTopic, booksMeta: filteredMeta }, null, 2);
-            const blob = new Blob([json], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
 
-            cleanup();
-            toast.success('فایل JSON با موفقیت دانلود شد');
+            try {
+                // First sync with backend to ensure latest data
+                await syncWithBackendSilent();
+
+                // Fetch complete data from backend including graph connections
+                const res = await fetch("http://localhost:8000/export");
+                if (!res.ok) throw new Error("Export failed");
+                const fullData = await res.json();
+
+                // Filter data based on selected topics
+                const filteredEntries = Object.fromEntries(
+                    finalTopics.map(t => [t, fullData.entriesByTopic[t] || []])
+                );
+                const filteredOrder = Object.fromEntries(
+                    finalTopics.map(t => [t, fullData.orderCounters[t] || 0])
+                );
+                const filteredMeta = Object.fromEntries(
+                    finalTopics.map(t => [t, fullData.booksMeta[t] || { id: randomDocId(), name: t, created: Date.now() }])
+                );
+
+                // Filter graph connections - only include connections for selected topics' documents
+                const selectedDocIds = finalTopics
+                    .map(t => fullData.booksMeta[t]?.id)
+                    .filter(Boolean);
+                const filteredGraphConnections = Object.fromEntries(
+                    selectedDocIds.map(docId => [docId, fullData.graphConnections[docId] || []])
+                );
+
+                // Create export data with all components including graph
+                const exportData = {
+                    entriesByTopic: filteredEntries,
+                    orderCounters: filteredOrder,
+                    currentTopic: finalTopics.includes(fullData.currentTopic) ? fullData.currentTopic : finalTopics[0],
+                    booksMeta: filteredMeta,
+                    graphConnections: filteredGraphConnections,
+                    exportedAt: fullData.exportedAt,
+                    version: fullData.version
+                };
+
+                const filename = `dataset-${finalTopics.length === 1 ? finalTopics[0] : 'multi'}-${new Date().toISOString().slice(0, 10)}.json`;
+                const json = JSON.stringify(exportData, null, 2);
+                const blob = new Blob([json], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                cleanup();
+                toast.success('فایل JSON با موفقیت دانلود شد (شامل داده‌های گراف)');
+            } catch (e) {
+                console.error(e);
+                toast.error('خطا در دانلود فایل. اطمینان حاصل کنید که سرور در حال اجرا است.');
+            }
         });
     }
 
     $(document).on("click", "#exportBtn", openExportModal);
 
-    async function syncWithBackend() {
-        const $btn = $("#syncBtn");
-        const $icon = $btn.find(".sync-icon");
-        const $text = $btn.find(".sync-text");
-        const $spinner = $btn.find(".sync-spinner");
-
+    async function syncWithBackendSilent() {
         const payload = {
             entriesByTopic,
             currentTopic,
             orderCounters,
             booksMeta
         };
-
-        // Loading state
-        $btn.prop("disabled", true).addClass("opacity-70 cursor-not-allowed");
-        $spinner.removeClass("hidden");
-        $icon.addClass("hidden");
-        $text.text("در حال سینک...");
 
         try {
             const res = await fetch("http://localhost:8000/sync", {
@@ -489,8 +519,38 @@ $(function () {
                 body: JSON.stringify(payload)
             });
             if (!res.ok) throw new Error("Sync failed");
-            const data = await res.json();
-            console.log("Synced:", data);
+
+            // Also sync graph connections from localStorage
+            const graphConnections = JSON.parse(localStorage.getItem("graphConnections") || "{}");
+            const graphRes = await fetch("http://localhost:8000/sync_graph", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ booksMeta, graphConnections })
+            });
+            if (!graphRes.ok) throw new Error("Graph sync failed");
+
+            return true;
+        } catch (e) {
+            console.error("Silent sync failed:", e);
+            return false;
+        }
+    }
+
+    async function syncWithBackend() {
+        const $btn = $("#syncBtn");
+        const $icon = $btn.find(".sync-icon");
+        const $text = $btn.find(".sync-text");
+        const $spinner = $btn.find(".sync-spinner");
+
+        // Loading state
+        $btn.prop("disabled", true).addClass("opacity-70 cursor-not-allowed");
+        $spinner.removeClass("hidden");
+        $icon.addClass("hidden");
+        $text.text("در حال سینک...");
+
+        try {
+            const success = await syncWithBackendSilent();
+            if (!success) throw new Error("Sync failed");
             $text.text("سینک شد ✅");
             setTimeout(() => { $text.text("سینک با بک‌اند"); }, 1500);
         } catch (e) {
@@ -519,14 +579,27 @@ $(function () {
         $text.text("در حال بازیابی...");
 
         try {
+            // Restore entries data
             const res = await fetch("http://localhost:8000/restore");
             if (!res.ok) throw new Error("Restore failed");
             const data = await res.json();
+
+            // Restore graph data
+            const graphRes = await fetch("http://localhost:8000/restore_graph");
+            if (!graphRes.ok) throw new Error("Graph restore failed");
+            const graphData = await graphRes.json();
+
             // Prefer server as source of truth upon restore
             entriesByTopic = data.entriesByTopic || {};
             orderCounters = data.orderCounters || {};
             booksMeta = data.booksMeta || data.topicMeta || {}; // Support old format
             currentTopic = data.currentTopic || Object.keys(entriesByTopic)[0] || currentTopic;
+
+            // Restore graph connections to localStorage
+            if (graphData.graphConnections) {
+                localStorage.setItem("graphConnections", JSON.stringify(graphData.graphConnections));
+            }
+
             ensureTopicIds();
             saveToStorage();
             reset();
@@ -599,6 +672,8 @@ $(function () {
                 const eb = data.entriesByTopic || {};
                 const oc = data.orderCounters || {};
                 const bm = data.booksMeta || data.topicMeta || {}; // Support old format
+                const gc = data.graphConnections || {}; // Import graph connections
+
                 // Merge topics into current state
                 Object.keys(eb).forEach(t => { entriesByTopic[t] = eb[t]; });
                 Object.keys(oc).forEach(t => { orderCounters[t] = oc[t]; });
@@ -615,11 +690,27 @@ $(function () {
                         booksMeta[t] = bm[t];
                     }
                 });
+
+                // Import graph connections to localStorage
+                if (Object.keys(gc).length > 0) {
+                    const existingGraphConnections = JSON.parse(localStorage.getItem("graphConnections") || "{}");
+                    // Merge graph connections (new data overwrites existing)
+                    Object.keys(gc).forEach(docId => {
+                        existingGraphConnections[docId] = gc[docId];
+                    });
+                    localStorage.setItem("graphConnections", JSON.stringify(existingGraphConnections));
+                }
+
                 ensureTopicIds();
                 saveToStorage();
                 renderTabs();
                 render();
-                toast.success("ایمپورت با موفقیت انجام شد.");
+
+                const graphCount = Object.keys(gc).length;
+                const msg = graphCount > 0
+                    ? `ایمپورت با موفقیت انجام شد (${graphCount} گراف وارد شد).`
+                    : "ایمپورت با موفقیت انجام شد.";
+                toast.success(msg);
             } catch (err) {
                 console.error(err);
                 toast.error("فایل نامعتبر است.");

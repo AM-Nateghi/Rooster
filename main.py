@@ -245,6 +245,89 @@ def cleanup_old_backups(metadata: Dict[str, Any]) -> None:
     metadata["backups"] = backups_to_keep
 
 
+@app.get("/export")
+def export_all_data() -> Dict[str, Any]:
+    """Export all data including entries and graph connections.
+
+    Returns a complete dataset with:
+    - entriesByTopic: All topic entries
+    - orderCounters: Order counters per topic
+    - currentTopic: Currently selected topic
+    - booksMeta: Metadata for each book/topic
+    - graphConnections: Graph connections per document
+    """
+    # Load entries data
+    entries_data = restore_data()
+
+    # Load graph data
+    graph_data = restore_graph_data()
+
+    # Combine all data
+    export_data = {
+        "entriesByTopic": entries_data.get("entriesByTopic", {}),
+        "orderCounters": entries_data.get("orderCounters", {}),
+        "currentTopic": entries_data.get("currentTopic"),
+        "booksMeta": entries_data.get("booksMeta", {}),
+        "graphConnections": graph_data.get("graphConnections", {}),
+        "exportedAt": datetime.now().isoformat(),
+        "version": "1.0.0"
+    }
+
+    return export_data
+
+
+@app.post("/import")
+def import_all_data(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Import all data including entries and graph connections.
+
+    Expected JSON example (compatible with export format):
+    {
+      "entriesByTopic": { "Topic A": [...] },
+      "orderCounters": { "Topic A": 3 },
+      "currentTopic": "Topic A",
+      "booksMeta": { "Topic A": {...} },
+      "graphConnections": { "doc_abc12345": [...] }
+    }
+    """
+    # Extract data
+    entries_by_topic = payload.get("entriesByTopic", {})
+    order_counters = payload.get("orderCounters", {})
+    current_topic = payload.get("currentTopic")
+    books_meta = payload.get("booksMeta", {})
+    graph_connections = payload.get("graphConnections", {})
+
+    # Save entries data using existing sync endpoint logic
+    if entries_by_topic:
+        sync_payload = {
+            "entriesByTopic": entries_by_topic,
+            "orderCounters": order_counters,
+            "currentTopic": current_topic,
+            "booksMeta": books_meta
+        }
+        sync_result = sync_data(sync_payload)
+    else:
+        sync_result = {"status": "ok", "saved": []}
+
+    # Save graph data if present
+    if books_meta or graph_connections:
+        graph_payload = {
+            "booksMeta": books_meta,
+            "graphConnections": graph_connections
+        }
+        graph_result = sync_graph_data(graph_payload)
+    else:
+        graph_result = {"status": "ok"}
+
+    return {
+        "status": "ok",
+        "message": "ایمپورت با موفقیت انجام شد",
+        "entries_imported": len(entries_by_topic),
+        "graph_imported": len(graph_connections),
+        "sync_result": sync_result,
+        "graph_result": graph_result
+    }
+
+
 @app.post("/backup")
 def create_backup() -> Dict[str, Any]:
     """Create a ZIP backup of all data in json_data directory.
