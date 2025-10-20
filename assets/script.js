@@ -347,77 +347,121 @@ $(function () {
         select($(this).data("id"));
     });
 
-    function openExportModal() {
-        const $modal = $("#exportModal");
-        const $chips = $("#exportTopicChips");
-        $chips.empty();
+    async function openExportModal() {
         const topics = Object.keys(entriesByTopic);
-        topics.forEach(t => {
-            const chip = $(`
-                <button class="export-chip px-3 py-1.5 text-sm rounded-full border select-none transition-colors"
-                        data-topic="${t}">
-                    <span class="font-medium">${t}</span>
-                </button>
-            `);
-            $chips.append(chip);
+
+        // Create the modal content
+        const modalId = 'export-modal-' + Date.now();
+        const modalHTML = `
+            <div id="${modalId}" class="fixed inset-0 z-[9998] flex items-center justify-center p-4 animate-fadeIn">
+                <div class="absolute inset-0 bg-black/50 dark:bg-black/70" data-modal-backdrop></div>
+                <div class="relative bg-white dark:bg-slate-800 backdrop-blur-sm rounded-xl max-w-xl w-full p-5 shadow-2xl border border-slate-200 dark:border-slate-700 animate-scaleIn">
+                    <h3 class="text-lg font-bold text-slate-800 dark:text-white mb-3">انتخاب موضوعات برای خروجی</h3>
+                    <p class="text-xs text-slate-600 dark:text-slate-400 mb-3">موضوعات مورد نظر را انتخاب کنید. اگر هیچکدام را انتخاب نکنید، همه موضوعات خروجی گرفته می‌شود.</p>
+                    <div id="exportTopicChips" class="flex flex-wrap gap-2 max-h-60 overflow-auto py-2 mb-4">
+                        ${topics.map(t => `
+                            <button class="export-chip px-3 py-1.5 text-sm rounded-full border select-none transition-all hover:scale-105 text-slate-800 dark:text-slate-100 border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600"
+                                    data-topic="${t}">
+                                <span class="font-medium">${t}</span>
+                            </button>
+                        `).join('')}
+                    </div>
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="flex gap-2">
+                            <button id="exportSelectAll" class="px-3 py-1.5 text-xs rounded-md bg-slate-200 text-slate-800 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600 transition-all active:scale-95 font-medium">
+                                انتخاب همه
+                            </button>
+                            <button id="exportClearAll" class="px-3 py-1.5 text-xs rounded-md bg-slate-200 text-slate-800 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600 transition-all active:scale-95 font-medium">
+                                حذف همه
+                            </button>
+                        </div>
+                        <div class="flex gap-2">
+                            <button class="modal-cancel px-4 py-2 text-sm rounded-lg bg-slate-200 text-slate-800 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600 transition-all active:scale-95 font-medium">
+                                لغو
+                            </button>
+                            <button class="modal-confirm px-4 py-2 text-sm rounded-lg text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-all active:scale-95 font-medium">
+                                دانلود
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        const $modal = $(`#${modalId}`);
+
+        // Update chip visual state
+        function updateChipsVisual() {
+            $modal.find('.export-chip').each(function () {
+                const $chip = $(this);
+                const active = $chip.hasClass('active');
+
+                if (active) {
+                    $chip.removeClass('text-slate-800 dark:text-slate-100 border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600');
+                    $chip.addClass('bg-blue-600 dark:bg-blue-500 text-white border-blue-600 dark:border-blue-500');
+                } else {
+                    $chip.removeClass('bg-blue-600 dark:bg-blue-500 text-white border-blue-600 dark:border-blue-500');
+                    $chip.addClass('text-slate-800 dark:text-slate-100 border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600');
+                }
+            });
+        }
+
+        // Toggle chip selection
+        $modal.on('click', '.export-chip', function () {
+            $(this).toggleClass('active');
+            updateChipsVisual();
         });
-        updateExportChipsVisual();
-        $modal.removeClass("hidden");
-    }
 
-    function closeExportModal() {
-        $("#exportModal").addClass("hidden");
-    }
+        // Select all
+        $modal.on('click', '#exportSelectAll', function () {
+            $modal.find('.export-chip').addClass('active');
+            updateChipsVisual();
+        });
 
-    function updateExportChipsVisual() {
-        $("#exportTopicChips .export-chip").each(function () {
-            const $c = $(this);
-            const active = $c.hasClass("active");
-            // Reset classes first
-            $c.removeClass("bg-blue-600 text-white border-blue-600 bg-white/70 text-slate-700 border-slate-300 hover:bg-slate-100 dark:bg-slate-700 dark:text-slate-100 dark:border-slate-600 hover:bg-black hover:text-white");
-            if (active) {
-                $c.addClass("bg-blue-600 text-white border-blue-600");
-            } else {
-                $c.addClass("text-slate-800 border-slate-300 hover:bg-white dark:bg-slate-700 dark:text-slate-100 dark:border-slate-600 dark:hover:bg-slate-700");
-            }
+        // Clear all
+        $modal.on('click', '#exportClearAll', function () {
+            $modal.find('.export-chip').removeClass('active');
+            updateChipsVisual();
+        });
+
+        // Cleanup function
+        const cleanup = () => {
+            $modal.addClass('animate-fadeOut');
+            setTimeout(() => $modal.remove(), 200);
+        };
+
+        // Cancel
+        $modal.on('click', '.modal-cancel, [data-modal-backdrop]', cleanup);
+
+        // Confirm and export
+        $modal.on('click', '.modal-confirm', function () {
+            const selectedTopics = $modal.find('.export-chip.active').map(function () {
+                return $(this).data('topic');
+            }).get();
+
+            const finalTopics = selectedTopics.length ? selectedTopics : topics;
+            const filteredEntries = Object.fromEntries(finalTopics.map(t => [t, entriesByTopic[t] || []]));
+            const filteredOrder = Object.fromEntries(finalTopics.map(t => [t, orderCounters[t] || 0]));
+            const filteredMeta = Object.fromEntries(finalTopics.map(t => [t, booksMeta[t] || { id: randomDocId(), name: t, created: Date.now() }]));
+            const filename = `dataset-${finalTopics.length === 1 ? finalTopics[0] : 'multi'}-${new Date().toISOString().slice(0, 10)}.json`;
+            const json = JSON.stringify({ entriesByTopic: filteredEntries, orderCounters: filteredOrder, currentTopic, booksMeta: filteredMeta }, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            cleanup();
+            toast.success('فایل JSON با موفقیت دانلود شد');
         });
     }
 
     $(document).on("click", "#exportBtn", openExportModal);
-    $(document).on("click", "#exportClose, #exportCancel", closeExportModal);
-    $(document).on("click", "#exportSelectAll", function () {
-        $("#exportTopicChips .export-chip").addClass("active");
-        updateExportChipsVisual();
-    });
-    $(document).on("click", "#exportClearAll", function () {
-        $("#exportTopicChips .export-chip").removeClass("active");
-        updateExportChipsVisual();
-    });
-    $(document).on("click", "#exportTopicChips .export-chip", function () {
-        $(this).toggleClass("active");
-        updateExportChipsVisual();
-    });
-
-    function performExportWithSelectedTopics() {
-        const selectedTopics = $("#exportTopicChips .export-chip.active").map(function () { return $(this).data("topic"); }).get();
-        const finalTopics = selectedTopics.length ? selectedTopics : Object.keys(entriesByTopic);
-        const filteredEntries = Object.fromEntries(finalTopics.map(t => [t, entriesByTopic[t] || []]));
-        const filteredOrder = Object.fromEntries(finalTopics.map(t => [t, orderCounters[t] || 0]));
-        const filteredMeta = Object.fromEntries(finalTopics.map(t => [t, booksMeta[t] || { id: randomDocId(), name: t, created: Date.now() }]));
-        const filename = `dataset-${finalTopics.length === 1 ? finalTopics[0] : 'multi'}-${new Date().toISOString().slice(0, 10)}.json`;
-        const json = JSON.stringify({ entriesByTopic: filteredEntries, orderCounters: filteredOrder, currentTopic, booksMeta: filteredMeta }, null, 2);
-        const blob = new Blob([json], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        closeExportModal();
-    }
-    $(document).on("click", "#exportConfirm", performExportWithSelectedTopics);
 
     async function syncWithBackend() {
         const $btn = $("#syncBtn");
