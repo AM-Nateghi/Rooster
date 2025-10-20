@@ -346,7 +346,7 @@ function renderGraph() {
             return `url(#${markerId})`;
         })
         .on('click', handleLinkClick)
-        .on('mouseenter', function(event, d) {
+        .on('mouseenter', function (event, d) {
             if (linkModeEnabled) return;
 
             // Clear any existing timer
@@ -357,7 +357,7 @@ function renderGraph() {
                 showLinkDetail(d, event);
             }, 800);
         })
-        .on('mouseleave', function() {
+        .on('mouseleave', function () {
             // Clear timer if mouse leaves before timeout
             if (hoverTimer) {
                 clearTimeout(hoverTimer);
@@ -387,7 +387,7 @@ function renderGraph() {
         .text(d => d.title.slice(0, 15));
 
     // Add hover handlers
-    node.on('mouseenter', function(event, d) {
+    node.on('mouseenter', function (event, d) {
         if (linkModeEnabled) return;
 
         // Clear any existing timer
@@ -398,13 +398,13 @@ function renderGraph() {
             showNodeDetail(d, event);
         }, 800);
     })
-    .on('mouseleave', function() {
-        // Clear timer if mouse leaves before timeout
-        if (hoverTimer) {
-            clearTimeout(hoverTimer);
-            hoverTimer = null;
-        }
-    });
+        .on('mouseleave', function () {
+            // Clear timer if mouse leaves before timeout
+            if (hoverTimer) {
+                clearTimeout(hoverTimer);
+                hoverTimer = null;
+            }
+        });
 
     // Update positions on tick
     simulation.on('tick', () => {
@@ -460,7 +460,7 @@ function showLinkTypeModal(sourceNode, targetNode) {
             </button>
         `);
 
-        $option.on('click', function() {
+        $option.on('click', function () {
             const selectedType = $(this).data('type');
             createConnection(sourceNode.id, targetNode.id, selectedType);
             $modal.addClass('hidden');
@@ -515,7 +515,7 @@ function createConnection(sourceId, targetId, type) {
     }
 }
 
-$('#cancelLinkType').on('click', function() {
+$('#cancelLinkType').on('click', function () {
     $('#linkTypeModal').addClass('hidden');
 });
 
@@ -577,15 +577,15 @@ function showLinkDetail(link, event) {
     if (link.userDefined && link.id) {
         // Add reverse button for directed links
         const reverseButton = linkConfig.directed ? `
-            <button id="reverseLinkBtn" data-link-id="${link.id}"
-                class="inline-block px-3 py-1 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 active:scale-95 transition-all float-right mr-2">
+            <button class="reverseLinkBtn inline-block px-3 py-1 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 active:scale-95 transition-all float-right mr-2"
+                data-link-id="${link.id}">
                 🔄 برعکس کردن
             </button>
         ` : '';
 
         actionButtons = `
-            <button id="deleteLinkBtn" data-link-id="${link.id}"
-                class="inline-block px-3 py-1 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600 active:scale-95 transition-all float-left">
+            <button class="deleteLinkBtn inline-block px-3 py-1 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600 active:scale-95 transition-all float-left"
+                data-link-id="${link.id}">
                 🗑️ حذف
             </button>
             ${reverseButton}
@@ -668,7 +668,7 @@ function positionTooltip($tooltip, event) {
 }
 
 // Handle delete link button click
-$(document).on('click', '#deleteLinkBtn', function(e) {
+$(document).on('click', '.deleteLinkBtn', function (e) {
     e.stopPropagation();
 
     const linkId = $(this).data('link-id');
@@ -698,7 +698,7 @@ $(document).on('click', '#deleteLinkBtn', function(e) {
 });
 
 // Handle reverse link button click
-$(document).on('click', '#reverseLinkBtn', function(e) {
+$(document).on('click', '.reverseLinkBtn', function (e) {
     e.stopPropagation();
 
     const linkId = $(this).data('link-id');
@@ -715,13 +715,17 @@ $(document).on('click', '#reverseLinkBtn', function(e) {
     }
 
     const connectionIndex = graphConnections[currentDocId].findIndex(c => c.id === linkId);
+
     if (connectionIndex === -1) {
+        console.error('❌ Connection not found with ID:', linkId);
+        console.log('Available connection IDs:', graphConnections[currentDocId].map(c => c.id));
         alert('خطا: یال یافت نشد');
         return;
     }
 
     // Reverse source and target
     const connection = graphConnections[currentDocId][connectionIndex];
+
     const tempSource = connection.source;
     connection.source = connection.target;
     connection.target = tempSource;
@@ -756,18 +760,15 @@ $(document).on('click', '#reverseLinkBtn', function(e) {
 });
 
 // Click outside tooltip to close
-$(document).on('click', function(e) {
+$(document).on('click', function (e) {
     const $tooltip = $('#detailTooltip');
 
-    // If tooltip is visible and click is outside tooltip
-    if (!$tooltip.hasClass('hidden') && !$tooltip.is(e.target) && $tooltip.has(e.target).length === 0) {
+    // If tooltip is visible and click is outside tooltip (and not on a button inside it)
+    if (!$tooltip.hasClass('hidden') &&
+        !$tooltip.is(e.target) &&
+        $tooltip.has(e.target).length === 0) {
         $tooltip.addClass('hidden');
     }
-});
-
-// Prevent tooltip clicks from closing it
-$('#detailTooltip').on('click', function(e) {
-    e.stopPropagation();
 });
 
 $('#linkToggle').on('click', function () {
@@ -793,7 +794,7 @@ $('#refreshData').on('click', function () {
 
 // Freeze/unfreeze simulation
 let isFrozen = false;
-$('#freezeToggle').on('click', function() {
+$('#freezeToggle').on('click', function () {
     isFrozen = !isFrozen;
     const $btn = $(this);
 
@@ -811,7 +812,7 @@ $('#freezeToggle').on('click', function() {
 });
 
 // Sync graph data with backend
-$('#syncGraph').on('click', async function() {
+$('#syncGraph').on('click', async function () {
     const $btn = $(this);
     const $icon = $btn.find('.sync-icon');
     const $text = $btn.find('.sync-text');
