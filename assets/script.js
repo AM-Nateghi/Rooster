@@ -3,7 +3,21 @@ $(function () {
     let currentTopic = localStorage.getItem("currentTopic") || Object.keys(entriesByTopic)[0] || "موضوع اصلی";
     let selectedId = null;
     let orderCounters = JSON.parse(localStorage.getItem("orderCounters") || "{}");
-    let topicMeta = JSON.parse(localStorage.getItem("topicMeta") || "{}");
+    let booksMeta = JSON.parse(localStorage.getItem("booksMeta") || "{}");
+
+    // Legacy support: migrate old topicMeta to booksMeta
+    const oldTopicMeta = JSON.parse(localStorage.getItem("topicMeta") || "{}");
+    if (Object.keys(oldTopicMeta).length > 0 && Object.keys(booksMeta).length === 0) {
+        Object.keys(oldTopicMeta).forEach(topic => {
+            booksMeta[topic] = {
+                id: randomDocId(),
+                name: topic,
+                created: oldTopicMeta[topic].created || Date.now(),
+                ...oldTopicMeta[topic]
+            };
+        });
+        localStorage.setItem("booksMeta", JSON.stringify(booksMeta));
+    }
 
     function initializeTheme() {
         const isDark = localStorage.getItem("isDark") === "true";
@@ -18,16 +32,26 @@ $(function () {
         localStorage.setItem("entriesByTopic", JSON.stringify(entriesByTopic));
         localStorage.setItem("currentTopic", currentTopic);
         localStorage.setItem("orderCounters", JSON.stringify(orderCounters));
-        localStorage.setItem("topicMeta", JSON.stringify(topicMeta));
+        localStorage.setItem("booksMeta", JSON.stringify(booksMeta));
     }
 
     function randomId() {
-        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$#*_";
         let id;
         do {
-            id = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+            id = Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
         } while (entriesByTopic[currentTopic]?.some(e => e.id === id));
         return id;
+    }
+
+    function randomDocId() {
+        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        return "doc_" + Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+    }
+
+    function randomLinkId() {
+        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$#*_";
+        return "link_" + Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
     }
 
     function randomTopicId() {
@@ -114,8 +138,20 @@ $(function () {
 
     function ensureTopicIds() {
         Object.keys(entriesByTopic).forEach(topic => {
-            if (!topicMeta[topic] || typeof topicMeta[topic]?.id !== "string" || topicMeta[topic].id.length !== 8) {
-                topicMeta[topic] = { id: randomTopicId() };
+            if (!booksMeta[topic]) {
+                booksMeta[topic] = {
+                    id: randomDocId(),
+                    name: topic,
+                    created: Date.now()
+                };
+            } else if (!booksMeta[topic].id || !booksMeta[topic].id.startsWith("doc_")) {
+                // Migrate old format
+                booksMeta[topic] = {
+                    id: randomDocId(),
+                    name: topic,
+                    created: booksMeta[topic].created || Date.now(),
+                    ...booksMeta[topic]
+                };
             }
         });
         saveToStorage();
@@ -241,11 +277,15 @@ $(function () {
                 delete orderCounters[oldTopic];
             }
 
-            if (topicMeta[oldTopic]) {
-                topicMeta[newName] = topicMeta[oldTopic];
-                delete topicMeta[oldTopic];
+            if (booksMeta[oldTopic]) {
+                booksMeta[newName] = { ...booksMeta[oldTopic], name: newName };
+                delete booksMeta[oldTopic];
             } else {
-                topicMeta[newName] = { id: randomTopicId() };
+                booksMeta[newName] = {
+                    id: randomDocId(),
+                    name: newName,
+                    created: Date.now()
+                };
             }
 
             saveToStorage();
@@ -262,14 +302,18 @@ $(function () {
         // Delete topic data
         delete entriesByTopic[topic];
         if (orderCounters[topic] !== undefined) delete orderCounters[topic];
-        if (topicMeta[topic] !== undefined) delete topicMeta[topic];
+        if (booksMeta[topic] !== undefined) delete booksMeta[topic];
         // Reassign currentTopic if needed
         const topics = Object.keys(entriesByTopic);
         if (!topics.length) {
             const defaultName = "موضوع اصلی";
             entriesByTopic[defaultName] = [];
             orderCounters[defaultName] = 0;
-            topicMeta[defaultName] = { id: randomTopicId() };
+            booksMeta[defaultName] = {
+                id: randomDocId(),
+                name: defaultName,
+                created: Date.now()
+            };
             currentTopic = defaultName;
         } else if (currentTopic === topic) {
             currentTopic = topics[0];
@@ -286,7 +330,11 @@ $(function () {
             if (entriesByTopic[name]) return alert("این نام قبلاً استفاده شده است!");
             entriesByTopic[name] = [];
             currentTopic = name;
-            topicMeta[name] = { id: randomTopicId() };
+            booksMeta[name] = {
+                id: randomDocId(),
+                name: name,
+                created: Date.now()
+            };
             saveToStorage();
             reset();
             renderTabs();
@@ -354,9 +402,9 @@ $(function () {
         const finalTopics = selectedTopics.length ? selectedTopics : Object.keys(entriesByTopic);
         const filteredEntries = Object.fromEntries(finalTopics.map(t => [t, entriesByTopic[t] || []]));
         const filteredOrder = Object.fromEntries(finalTopics.map(t => [t, orderCounters[t] || 0]));
-        const filteredMeta = Object.fromEntries(finalTopics.map(t => [t, topicMeta[t] || { id: randomTopicId() }]));
+        const filteredMeta = Object.fromEntries(finalTopics.map(t => [t, booksMeta[t] || { id: randomDocId(), name: t, created: Date.now() }]));
         const filename = `dataset-${finalTopics.length === 1 ? finalTopics[0] : 'multi'}-${new Date().toISOString().slice(0, 10)}.json`;
-        const json = JSON.stringify({ entriesByTopic: filteredEntries, orderCounters: filteredOrder, currentTopic, topicMeta: filteredMeta }, null, 2);
+        const json = JSON.stringify({ entriesByTopic: filteredEntries, orderCounters: filteredOrder, currentTopic, booksMeta: filteredMeta }, null, 2);
         const blob = new Blob([json], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -380,7 +428,7 @@ $(function () {
             entriesByTopic,
             currentTopic,
             orderCounters,
-            topicMeta
+            booksMeta
         };
 
         // Loading state
@@ -432,7 +480,7 @@ $(function () {
             // Prefer server as source of truth upon restore
             entriesByTopic = data.entriesByTopic || {};
             orderCounters = data.orderCounters || {};
-            topicMeta = data.topicMeta || {};
+            booksMeta = data.booksMeta || data.topicMeta || {}; // Support old format
             currentTopic = data.currentTopic || Object.keys(entriesByTopic)[0] || currentTopic;
             ensureTopicIds();
             saveToStorage();
@@ -468,11 +516,23 @@ $(function () {
                 const data = JSON.parse(reader.result);
                 const eb = data.entriesByTopic || {};
                 const oc = data.orderCounters || {};
-                const tm = data.topicMeta || {};
+                const bm = data.booksMeta || data.topicMeta || {}; // Support old format
                 // Merge topics into current state
                 Object.keys(eb).forEach(t => { entriesByTopic[t] = eb[t]; });
                 Object.keys(oc).forEach(t => { orderCounters[t] = oc[t]; });
-                Object.keys(tm).forEach(t => { topicMeta[t] = tm[t]; });
+                Object.keys(bm).forEach(t => {
+                    // Migrate old format to new format if needed
+                    if (bm[t].id && !bm[t].id.startsWith("doc_")) {
+                        booksMeta[t] = {
+                            id: randomDocId(),
+                            name: t,
+                            created: bm[t].created || Date.now(),
+                            ...bm[t]
+                        };
+                    } else {
+                        booksMeta[t] = bm[t];
+                    }
+                });
                 ensureTopicIds();
                 saveToStorage();
                 renderTabs();

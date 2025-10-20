@@ -86,6 +86,7 @@ def sync_data(payload: Dict[str, Any]) -> Dict[str, Any]:
         "currentTopic": payload.get("currentTopic"),
         "orderCounters": payload.get("orderCounters", {}),
         "topicMeta": payload.get("topicMeta", {}),
+        "booksMeta": payload.get("booksMeta", {}),
         "topics": list(entries_by_topic.keys()),
         "files": saved_files,
     }
@@ -119,6 +120,7 @@ def restore_data() -> Dict[str, Any]:
     current_topic = None
     order_counters: Dict[str, int] = {}
     topic_meta: Dict[str, Any] = {}
+    books_meta: Dict[str, Any] = {}
     manifest_path = JSON_DATA_DIR / "manifest.json"
     if manifest_path.exists():
         try:
@@ -126,6 +128,7 @@ def restore_data() -> Dict[str, Any]:
             current_topic = manifest.get("currentTopic")
             order_counters = manifest.get("orderCounters") or {}
             topic_meta = manifest.get("topicMeta") or {}
+            books_meta = manifest.get("booksMeta") or {}
         except Exception:
             pass
 
@@ -134,7 +137,62 @@ def restore_data() -> Dict[str, Any]:
         "orderCounters": order_counters,
         "currentTopic": current_topic,
         "topicMeta": topic_meta,
+        "booksMeta": books_meta,
     }
+
+
+@app.post("/sync_graph")
+def sync_graph_data(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Persist graph connections and books metadata to the server.
+
+    Expected JSON example:
+    {
+      "booksMeta": { "Topic A": {"id": "doc_abc12345", "name": "Topic A", ...} },
+      "graphConnections": { "doc_abc12345": [ {...connection objects...} ] }
+    }
+    """
+    books_meta = payload.get("booksMeta")
+    graph_connections = payload.get("graphConnections")
+
+    if not isinstance(books_meta, dict):
+        raise HTTPException(
+            status_code=400, detail="booksMeta is required and must be an object"
+        )
+
+    JSON_DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Save graph connections
+    graph_data_path = JSON_DATA_DIR / "graph_data.json"
+    graph_data = {
+        "booksMeta": books_meta,
+        "graphConnections": graph_connections or {},
+        "lastSync": json.loads(json.dumps({}))  # Timestamp placeholder
+    }
+    with graph_data_path.open("w", encoding="utf-8") as f:
+        json.dump(graph_data, f, ensure_ascii=False, indent=2)
+
+    return {"status": "ok", "message": "Graph data synced successfully"}
+
+
+@app.get("/restore_graph")
+def restore_graph_data() -> Dict[str, Any]:
+    """Return saved graph connections and books metadata.
+
+    Returns booksMeta and graphConnections from graph_data.json if it exists.
+    """
+    graph_data_path = JSON_DATA_DIR / "graph_data.json"
+
+    if not graph_data_path.exists():
+        return {"booksMeta": {}, "graphConnections": {}}
+
+    try:
+        graph_data = json.loads(graph_data_path.read_text(encoding="utf-8"))
+        return {
+            "booksMeta": graph_data.get("booksMeta", {}),
+            "graphConnections": graph_data.get("graphConnections", {})
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading graph data: {str(e)}")
 
 
 if __name__ == "__main__":  # pragma: no cover

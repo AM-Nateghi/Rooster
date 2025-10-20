@@ -37,11 +37,17 @@
 
             <!-- Sidebar -->
             <aside class="w-72 flex flex-col gap-4 overflow-y-auto">
-                <!-- Refresh Button -->
-                <section class="glass rounded-xl p-4 shadow-md">
+                <!-- Refresh & Sync Buttons -->
+                <section class="glass rounded-xl p-4 shadow-md space-y-2">
                     <button id="refreshData"
                         class="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 active:scale-95">
                         <span>🔄</span> <span>بارگذاری مجدد داده‌ها</span>
+                    </button>
+                    <button id="syncGraph"
+                        class="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-green-500 rounded-lg hover:bg-green-600 active:scale-95">
+                        <span class="sync-spinner hidden">⏳</span>
+                        <span class="sync-icon">☁️</span>
+                        <span class="sync-text">همگام‌سازی گراف</span>
                     </button>
                 </section>
 
@@ -112,6 +118,19 @@
 
         </div>
     </main>
+
+    <!-- Link Type Dropdown Modal -->
+    <div id="linkTypeModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="glass rounded-xl p-6 shadow-xl max-w-md w-full mx-4">
+            <h3 class="text-lg font-bold text-slate-800 dark:text-slate-200 mb-4">انتخاب نوع ارتباط</h3>
+            <div id="linkTypeOptions" class="space-y-2 mb-4"></div>
+            <div class="flex gap-2">
+                <button id="cancelLinkType" class="flex-1 px-4 py-2 bg-gray-300 dark:bg-gray-600 text-slate-800 dark:text-slate-200 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500">
+                    لغو
+                </button>
+            </div>
+        </div>
+    </div>
 
     <script src="assets/graph.js"></script>
 </body>
