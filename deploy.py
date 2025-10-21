@@ -12,7 +12,7 @@ from datetime import datetime
 import platform
 
 # Project structure
-REQUIRED_FILES = ["rooster.main.py", "index.html", "graph.html", "requirements.txt"]
+REQUIRED_FILES = ["main.py", "index.html", "graph.html", "requirements.txt"]
 
 REQUIRED_DIRS = [
     "assets",
@@ -160,7 +160,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
-COPY rooster.main.py .
+COPY main.py .
 COPY config.py .
 COPY run_production.py .
 COPY index.html .
@@ -479,9 +479,9 @@ def main():
     print("🚀 Rooster Deployment Builder\n")
 
     # Check if we're in the right directory
-    if not Path("rooster.main.py").exists():
+    if not Path("main.py").exists():
         print(
-            "❌ Error: rooster.main.py not found. Run this script from the project root."
+            "❌ Error: main.py not found. Run this script from the project root."
         )
         sys.exit(1)
 

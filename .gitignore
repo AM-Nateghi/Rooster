@@ -4,3 +4,4 @@ __pycache__/*
 ready_book/*
 backups/*
 .vscode/*
+.deploy/*
