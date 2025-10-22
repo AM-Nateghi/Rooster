@@ -447,7 +447,7 @@ $(function () {
                 await syncWithBackendSilent();
 
                 // Fetch complete data from backend including graph connections
-                const res = await fetch("http://localhost:8000/export");
+                const res = await fetch("/export");
                 if (!res.ok) throw new Error("Export failed");
                 const fullData = await res.json();
 
@@ -513,7 +513,7 @@ $(function () {
         };
 
         try {
-            const res = await fetch("http://localhost:8000/sync", {
+            const res = await fetch("/sync", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
@@ -522,7 +522,7 @@ $(function () {
 
             // Also sync graph connections from localStorage
             const graphConnections = JSON.parse(localStorage.getItem("graphConnections") || "{}");
-            const graphRes = await fetch("http://localhost:8000/sync_graph", {
+            const graphRes = await fetch("/sync_graph", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ booksMeta, graphConnections })
@@ -580,12 +580,12 @@ $(function () {
 
         try {
             // Restore entries data
-            const res = await fetch("http://localhost:8000/restore");
+            const res = await fetch("/restore");
             if (!res.ok) throw new Error("Restore failed");
             const data = await res.json();
 
             // Restore graph data
-            const graphRes = await fetch("http://localhost:8000/restore_graph");
+            const graphRes = await fetch("/restore_graph");
             if (!graphRes.ok) throw new Error("Graph restore failed");
             const graphData = await graphRes.json();
 
@@ -633,7 +633,7 @@ $(function () {
         $text.text("در حال بک‌آپ...");
 
         try {
-            const res = await fetch("http://localhost:8000/backup", {
+            const res = await fetch("/backup", {
                 method: "POST"
             });
             if (!res.ok) {
@@ -684,7 +684,7 @@ $(function () {
                 await syncWithBackendSilent();
 
                 // Send to backend endpoint
-                const res = await fetch("http://localhost:8000/import_gemini_book", {
+                const res = await fetch("/import_gemini_book", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(geminiData)
