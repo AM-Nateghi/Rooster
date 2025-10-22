@@ -13,7 +13,6 @@
     </script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <link rel="stylesheet" href="assets/public.css">
     <link rel="stylesheet" href="assets/shared.css">
     <link rel="stylesheet" href="assets/graph.css">
     <script src="assets/toast.js" defer></script>
@@ -27,7 +26,7 @@
         <div class="max-w-full mx-auto">
             <div class="glass rounded-xl p-4 shadow-md">
                 <div class="flex justify-between items-center">
-                    <h1 class="text-xl md:text-2xl font-bold text-black dark:text-white">
+                    <h1 class="text-xl md:text-2xl font-bold text-slate-800 dark:text-white">
                         🔗 نمایشگر گراف چانک‌های کتاب
                     </h1>
                     <button id="darkToggle"
@@ -65,11 +64,11 @@
                     <div class="grid grid-cols-2 gap-3 text-center">
                         <div>
                             <p class="text-2xl font-bold text-blue-600 dark:text-blue-400" id="nodeCount">0</p>
-                            <p class="text-xs text-gray-600 dark:text-gray-400">نودها</p>
+                            <p class="text-xs text-slate-600 dark:text-slate-300">نودها</p>
                         </div>
                         <div>
                             <p class="text-2xl font-bold text-green-600 dark:text-green-400" id="linkCount">0</p>
-                            <p class="text-xs text-gray-600 dark:text-gray-400">یال‌ها</p>
+                            <p class="text-xs text-slate-600 dark:text-slate-300">یال‌ها</p>
                         </div>
                     </div>
                 </section>
@@ -84,7 +83,7 @@
                                 class="absolute top-1 right-1 w-4 h-4 bg-white rounded-full transition-transform duration-200"></span>
                         </button>
                     </div>
-                    <p class="text-xs text-gray-600 dark:text-gray-400">
+                    <p class="text-xs text-slate-600 dark:text-slate-300">
                         روشن: برای ایجاد یال، دو نود را انتخاب کنید
                     </p>
                 </section>
@@ -112,8 +111,8 @@
                     <div id="emptyState" class="absolute inset-0 flex items-center justify-center">
                         <div class="text-center">
                             <p class="text-6xl mb-4">🔍</p>
-                            <p class="text-lg text-gray-600 dark:text-gray-400">هنوز داده‌ای بارگذاری نشده است</p>
-                            <p class="text-sm text-gray-500 dark:text-gray-500 mt-2">از صفحه اصلی چانک‌های خود را اضافه
+                            <p class="text-lg text-slate-600 dark:text-slate-300">هنوز داده‌ای بارگذاری نشده است</p>
+                            <p class="text-sm text-slate-500 dark:text-slate-400 mt-2">از صفحه اصلی چانک‌های خود را اضافه
                                 کنید</p>
                         </div>
                     </div>

@@ -85,9 +85,9 @@ $(function () {
         Object.keys(entriesByTopic).forEach(topic => {
             const count = entriesByTopic[topic].length;
             const tab = $(`
-                <button class="tab px-3 py-1.5 text-sm font-medium rounded-lg whitespace-nowrap flex items-center gap-1.5 ${topic === currentTopic ? 'active-tab' : 'glass-card hover:bg-slate-200 dark:hover:bg-slate-700'}" data-topic="${topic}">
+                <button class="tab px-3 py-1.5 text-sm font-medium rounded-lg whitespace-nowrap flex items-center gap-1.5 text-slate-700 dark:text-slate-200 transition-colors ${topic === currentTopic ? 'active-tab' : 'glass-card hover:bg-slate-200 dark:hover:bg-slate-600'}" data-topic="${topic}">
                     <span>${topic}</span>
-                    <span class="text-xs opacity-70">(${count})</span>
+                    <span class="text-xs opacity-80">(${count})</span>
                     <span class="tab-rename-icon text-xs cursor-pointer hover:scale-125" data-action="rename">✏️</span>
                     <span class="tab-delete-icon text-xs cursor-pointer hover:scale-125" data-action="delete">🗑️</span>
                 </button>
@@ -118,12 +118,12 @@ $(function () {
                 const preview = e.input.slice(0, 30);
                 const words = getWordCount(e.input);
                 const card = $(`
-                    <div class="glass-card p-3 rounded-lg cursor-pointer hover:shadow-lg" data-id="${e.id}">
+                    <div class="glass-card p-3 rounded-lg cursor-pointer hover:shadow-lg transition-all" data-id="${e.id}">
                         <div class="flex justify-between items-center mb-2">
-                            <span class="text-xs font-mono opacity-60">${e.id}</span>
-                            <span class="text-xs opacity-50">#${e.order}</span>
+                            <span class="text-xs font-mono text-slate-600 dark:text-slate-400">${e.id}</span>
+                            <span class="text-xs text-slate-500 dark:text-slate-500 font-semibold">#${e.order}</span>
                         </div>
-                        <p class="text-sm text-gray-800 dark:text-gray-200 h-10 overflow-hidden text-ellipsis">${preview}</p>
+                        <p class="text-sm text-slate-800 dark:text-slate-100 h-10 overflow-hidden text-ellipsis">${preview}</p>
                         <div class="flex justify-end items-center mt-2">
                             <span class="px-2 py-0.5 rounded-full text-xs font-bold text-white ${badgeColor(words)}">${words} کلمه</span>
                         </div>

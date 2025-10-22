@@ -193,7 +193,7 @@ function renderBookList() {
         const $item = $(`
                     <div class="book-item glass-card p-3 rounded-lg cursor-pointer hover:shadow-lg" data-book="${book}">
                         <div class="flex justify-between items-center">
-                            <span class="font-medium text-sm text-slate-800 dark:text-slate-200">${book}</span>
+                            <span class="font-medium text-sm text-slate-800 dark:text-slate-100">${book}</span>
                             <span class="text-xs px-2 py-0.5 rounded-full bg-blue-500 text-white">${count}</span>
                         </div>
                     </div>
@@ -381,6 +381,17 @@ function renderGraph() {
         .attr('r', 14)
         .attr('fill', d => nodeColors[d.type] || nodeColors.default);
 
+    // Add order number inside the circle
+    node.append('text')
+        .attr('class', 'node-order')
+        .attr('dy', 5)
+        .attr('text-anchor', 'middle')
+        .attr('fill', 'white')
+        .attr('font-size', '12px')
+        .attr('font-weight', 'bold')
+        .attr('pointer-events', 'none')
+        .text(d => d.order || '');
+
     node.append('text')
         .attr('class', 'node-label')
         .attr('dy', -20)
@@ -455,8 +466,8 @@ function showLinkTypeModal(sourceNode, targetNode) {
                     data-type="${type}"
                     style="border-color: ${config.color}20; background: ${config.color}10;">
                 <div class="w-4 h-4 rounded-full" style="background: ${config.color};"></div>
-                <span class="font-semibold text-slate-800 dark:text-slate-200">${type}</span>
-                <span class="text-xs text-slate-600 dark:text-slate-400 mr-auto">${config.directed ? '→' : '↔'}</span>
+                <span class="font-semibold text-slate-800 dark:text-slate-100">${type}</span>
+                <span class="text-xs text-slate-600 dark:text-slate-300 mr-auto">${config.directed ? '→' : '↔'}</span>
             </button>
         `);
 
@@ -540,19 +551,19 @@ function showNodeDetail(node, event) {
     $('#detailContent').html(`
         <div>
             <div class="font-semibold">شناسه:</div>
-            <div class="text-gray-900">${node.id}</div>
+            <div class="text-slate-800 dark:text-slate-200">${node.id}</div>
         </div>
         <div>
             <div class="font-semibold">نوع:</div>
-            <div class="text-gray-900">${node.type}</div>
+            <div class="text-slate-800 dark:text-slate-200">${node.type}</div>
         </div>
         <div>
             <div class="font-semibold">ترتیب:</div>
-            <div class="text-gray-900">#${node.order}</div>
+            <div class="text-slate-800 dark:text-slate-200">#${node.order}</div>
         </div>
         <div>
             <div class="font-semibold">خلاصه متن:</div>
-            <div class="text-gray-900 leading-relaxed text-justify">${displayText}</div>
+            <div class="text-slate-800 dark:text-slate-200 leading-relaxed text-justify">${displayText}</div>
         </div>
     `);
 
@@ -600,25 +611,25 @@ function showLinkDetail(link, event) {
             <div class="font-semibold">نوع:</div>
             <div class="flex items-center gap-2">
                 <div class="w-3 h-3 rounded-full" style="background: ${linkConfig.color};"></div>
-                <span class="text-gray-900">${link.type}</span>
-                <span class="text-xs text-gray-600 dark:text-gray-400">${linkConfig.directed ? '(جهت‌دار →)' : '(دوطرفه ↔)'}</span>
+                <span class="text-slate-800 dark:text-slate-200">${link.type}</span>
+                <span class="text-xs text-slate-600 dark:text-slate-300">${linkConfig.directed ? '(جهت‌دار →)' : '(دوطرفه ↔)'}</span>
             </div>
         </div>
         <div>
             <div class="font-semibold">از نود:</div>
-            <div class="text-gray-900">${sourceNode?.title || 'نامشخص'}</div>
+            <div class="text-slate-800 dark:text-slate-200">${sourceNode?.title || 'نامشخص'}</div>
         </div>
         <div>
             <div class="font-semibold">به نود:</div>
-            <div class="text-gray-900">${targetNode?.title || 'نامشخص'}</div>
+            <div class="text-slate-800 dark:text-slate-200">${targetNode?.title || 'نامشخص'}</div>
         </div>
         <div>
             <div class="font-semibold">تاریخ ایجاد:</div>
-            <div class="text-gray-900">${createdDate}</div>
+            <div class="text-slate-800 dark:text-slate-200">${createdDate}</div>
         </div>
         <div>
             <div class="font-semibold">وضعیت:</div>
-            <div class="text-gray-900">${link.userDefined ? '✅ ایجاد شده توسط کاربر' : '🤖 پیش‌فرض سیستم'}</div>
+            <div class="text-slate-800 dark:text-slate-200">${link.userDefined ? '✅ ایجاد شده توسط کاربر' : '🤖 پیش‌فرض سیستم'}</div>
         </div>
         <div class="mt-3 clearfix">
             ${actionButtons}

@@ -55,3 +55,8 @@ body {
 body:not(.dark) {
     background: linear-gradient(180deg, #fff8ed 0%, #f8efe4 100%);
 }
+
+/* Dark mode background gradient */
+body.dark {
+    background: linear-gradient(180deg, #0f172a 0%, #1a2b3d 100%);
+}
