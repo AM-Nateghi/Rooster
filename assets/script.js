@@ -779,6 +779,99 @@ $(function () {
         reader.readAsText(file, "utf-8");
     });
 
+    // Fix IDs for current topic
+    $(document).on("click", "#fixIdsBtn", async function () {
+        if (!await modal.confirm(
+            `آیا از بازنشانی آیدی‌های تمام چانک‌های موضوع "${currentTopic}" مطمئن هستید؟\n` +
+            `این عملیات روابط گراف مربوطه را نیز به‌روزرسانی می‌کند.`,
+            { title: "تایید بازنشانی آیدی‌ها" }
+        )) return;
+
+        const $btn = $("#fixIdsBtn");
+        const $icon = $btn.find(".fix-icon");
+        const $text = $btn.find(".fix-text");
+        const $spinner = $btn.find(".fix-spinner");
+
+        $btn.prop("disabled", true).addClass("opacity-70 cursor-not-allowed");
+        $spinner.removeClass("hidden");
+        $icon.addClass("hidden");
+        $text.text("در حال اصلاح...");
+
+        try {
+            const chunks = entriesByTopic[currentTopic] || [];
+            if (chunks.length === 0) {
+                toast.warning("هیچ چانکی برای بازنشانی وجود ندارد!");
+                return;
+            }
+
+            // Create mapping from old IDs to new IDs
+            const idMapping = {};
+            const usedIds = new Set();
+
+            // Collect all existing IDs from all topics to avoid collisions
+            Object.values(entriesByTopic).flat().forEach(chunk => {
+                if (chunk.id) usedIds.add(chunk.id);
+            });
+
+            // Generate new unique IDs for current topic's chunks
+            chunks.forEach(chunk => {
+                let newId;
+                do {
+                    newId = randomId();
+                } while (usedIds.has(newId));
+
+                idMapping[chunk.id] = newId;
+                usedIds.add(newId);
+                chunk.id = newId;
+            });
+
+            // Update graph connections
+            const currentDocId = booksMeta[currentTopic]?.id;
+            if (currentDocId) {
+                const graphConnections = JSON.parse(localStorage.getItem("graphConnections") || "{}");
+
+                if (graphConnections[currentDocId]) {
+                    // Update source and target in all connections
+                    graphConnections[currentDocId] = graphConnections[currentDocId].map(connection => {
+                        const updatedConnection = { ...connection };
+
+                        if (idMapping[connection.source]) {
+                            updatedConnection.source = idMapping[connection.source];
+                        }
+                        if (idMapping[connection.target]) {
+                            updatedConnection.target = idMapping[connection.target];
+                        }
+
+                        return updatedConnection;
+                    });
+
+                    localStorage.setItem("graphConnections", JSON.stringify(graphConnections));
+                }
+            }
+
+            // Save changes
+            saveToStorage();
+            render();
+
+            // Sync with backend
+            await syncWithBackendSilent();
+
+            toast.success(`${chunks.length} چانک با موفقیت بازنشانی شد`);
+            $text.text("اصلاح شد ✅");
+            setTimeout(() => { $text.text("اصلاح آیدی‌های چانک"); }, 1500);
+
+        } catch (err) {
+            console.error(err);
+            toast.error("خطا در بازنشانی آیدی‌ها");
+            $text.text("خطا ❌");
+            setTimeout(() => { $text.text("اصلاح آیدی‌های چانک"); }, 1500);
+        } finally {
+            $btn.prop("disabled", false).removeClass("opacity-70 cursor-not-allowed");
+            $spinner.addClass("hidden");
+            $icon.removeClass("hidden");
+        }
+    });
+
     // Initial Load
     initializeTheme();
     ensureTopicIds();
