@@ -1216,7 +1216,7 @@ $('#syncGraph').on('click', async function () {
     $text.text('در حال همگام‌سازی...');
 
     try {
-        const res = await fetch('http://localhost:8000/sync_graph', {
+        const res = await fetch('/sync_graph', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
