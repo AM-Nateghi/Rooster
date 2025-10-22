@@ -5,8 +5,9 @@ let booksMeta = {};
 let graphConnections = {};
 let currentBook = null;
 let currentDocId = null;
-let linkModeEnabled = false;
+let editModeEnabled = false; // false = review mode, true = edit mode
 let overviewModeEnabled = false; // Overview mode state
+let showNodeId = false; // false = show title, true = show ID
 let selectedNodeForLink = null;
 let simulation = null;
 let nodePositions = {}; // Store node positions to preserve them between renders
@@ -359,26 +360,60 @@ function renderGraph() {
         };
     });
 
-    // Create force simulation optimized for clustered graphs
+    // Create force simulation with clustering for overview mode
     simulation = d3.forceSimulation(nodes)
         .force('link', d3.forceLink(graphData.links)
             .id(d => d.id)
-            .distance(100)  // کلاسترها فشرده‌تر
-            .strength(0.7))  // کشش قوی‌تر برای نگه داشتن کلاسترها
+            .distance(100)
+            .strength(0.7))
         .force('charge', d3.forceManyBody()
-            .strength(-1200)  // دفع خیلی قوی برای جدا نگه داشتن نودها
-            .distanceMax(500)  // محدوده تاثیر بزرگتر
-            .theta(0.8))  // دقت بیشتر در محاسبات
+            .strength(-1200)
+            .distanceMax(500)
+            .theta(0.8))
         .force('center', d3.forceCenter(width / 2, height / 2)
-            .strength(0.02))  // کشش خیلی ضعیف به مرکز
+            .strength(0.02))
         .force('collision', d3.forceCollide()
-            .radius(60)  // حباب برخورد خیلی بزرگ
-            .strength(1)  // قدرت برخورد حداکثر
-            .iterations(3))  // چند بار چک کردن برخورد
+            .radius(60)
+            .strength(1)
+            .iterations(3))
         .force('x', d3.forceX(width / 2).strength(0.005))
         .force('y', d3.forceY(height / 2).strength(0.005))
-        .alphaDecay(0.01)  // خیلی کند آروم میشه
-        .velocityDecay(0.4);  // اصطکاک متوسط
+        .alphaDecay(0.01)
+        .velocityDecay(0.4);
+
+    // Add clustering force in overview mode
+    if (overviewModeEnabled) {
+        // Get unique books and assign each a position in a circle
+        const books = [...new Set(nodes.map(n => n.book))];
+        const bookCount = books.length;
+        const clusterRadius = Math.min(width, height) * 0.3; // Radius for book clusters
+
+        // Create book positions in a circle around the center
+        const bookPositions = {};
+        books.forEach((book, i) => {
+            const angle = (i / bookCount) * 2 * Math.PI;
+            bookPositions[book] = {
+                x: width / 2 + clusterRadius * Math.cos(angle),
+                y: height / 2 + clusterRadius * Math.sin(angle)
+            };
+        });
+
+        // Add radial force to pull nodes towards their book cluster
+        simulation.force('cluster', d3.forceRadial(
+            d => {
+                // Each node is pulled towards its book's position
+                return 0; // Distance from cluster center
+            },
+            d => bookPositions[d.book]?.x || width / 2,
+            d => bookPositions[d.book]?.y || height / 2
+        ).strength(0.3));
+
+        // Stronger collision to keep clusters separate
+        simulation.force('collision', d3.forceCollide()
+            .radius(70)
+            .strength(1.2)
+            .iterations(4));
+    }
 
     // If was frozen, stop immediately
     if (isFrozen) {
@@ -466,11 +501,20 @@ function renderGraph() {
     node.append('text')
         .attr('class', 'node-label')
         .attr('dy', -20)
-        .text(d => d.title.slice(0, 15));
+        .text(d => {
+            if (showNodeId) {
+                // Show ID (truncate if too long)
+                return d.id.length > 12 ? d.id.slice(0, 12) + '...' : d.id;
+            } else {
+                // Show title
+                return d.title.slice(0, 15);
+            }
+        });
 
     // Add hover handlers
     node.on('mouseenter', function (event, d) {
-        if (linkModeEnabled) return;
+        // In edit mode, don't show tooltip on hover for nodes (only on click)
+        if (editModeEnabled) return;
 
         // Clear any existing timer
         if (hoverTimer) clearTimeout(hoverTimer);
@@ -503,20 +547,20 @@ function renderGraph() {
 function handleNodeClick(event, d) {
     event.stopPropagation();
 
-    if (linkModeEnabled && selectedNodeForLink) {
+    if (editModeEnabled && selectedNodeForLink) {
         // Create new link - show dropdown to select type
         if (selectedNodeForLink.id !== d.id) {
             showLinkTypeModal(selectedNodeForLink, d);
         }
         selectedNodeForLink = null;
         d3.selectAll('.node').classed('selected', false);
-    } else if (linkModeEnabled) {
+    } else if (editModeEnabled) {
         // Select node for linking
         selectedNodeForLink = d;
         d3.selectAll('.node').classed('selected', false);
         d3.select(event.currentTarget).classed('selected', true);
     } else {
-        // Show tooltip immediately on click
+        // Review mode: Show tooltip immediately on click (only edit button works)
         showNodeDetail(d, event);
     }
 }
@@ -604,35 +648,40 @@ $('#cancelLinkType').on('click', function () {
 function handleLinkClick(event, d) {
     event.stopPropagation();
 
-    if (!linkModeEnabled) {
-        showLinkDetail(d, event);
-    }
+    // Always show link detail (in review mode, action buttons won't work)
+    showLinkDetail(d, event);
 }
 
 function showNodeDetail(node, event) {
     const $tooltip = $('#detailTooltip');
 
-    // Truncate text to 500 characters
-    const maxLength = 500;
+    // Truncate text to 300 characters
+    const maxLength = 300;
     const displayText = node.fullText.length > maxLength
         ? node.fullText.substring(0, maxLength) + '...'
         : node.fullText;
 
-    $('#detailTitle').text('جزئیات نود');
-
     // Build book info HTML (show in overview mode)
     const bookInfo = overviewModeEnabled && node.book ? `
-        <div>
-            <div class="font-semibold">کتاب:</div>
-            <div class="text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                <span class="inline-block w-3 h-3 rounded-full" style="background-color: ${getBookColor(node.book)};"></span>
-                <span>${node.book}</span>
-            </div>
+        <div class="flex items-center gap-2">
+            <span class="inline-block w-3 h-3 rounded-full" style="background-color: ${getBookColor(node.book)};"></span>
+            <span class="text-slate-800 dark:text-slate-200">${node.book}</span>
         </div>
     ` : '';
 
+    $('#detailTitle').html(`
+        <div class="flex items-center justify-between">
+            <span>جزئیات نود</span>
+            <button class="editNodeBtn px-3 py-1 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 active:scale-95 transition-all"
+                data-node-id="${node.id}"
+                data-book="${overviewModeEnabled ? node.book : currentBook}">
+                ✏️ ویرایش
+            </button>
+        </div>
+    `);
+
     $('#detailContent').html(`
-        ${bookInfo}
+        ${bookInfo ? `<div><div class="font-semibold">کتاب:</div>${bookInfo}</div>` : ''}
         <div>
             <div class="font-semibold">شناسه:</div>
             <div class="text-slate-800 dark:text-slate-200">${node.id}</div>
@@ -648,13 +697,6 @@ function showNodeDetail(node, event) {
         <div>
             <div class="font-semibold">خلاصه متن:</div>
             <div class="text-slate-800 dark:text-slate-200 leading-relaxed text-justify">${displayText}</div>
-        </div>
-        <div class="mt-3">
-            <button class="editNodeBtn w-full px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 active:scale-95 transition-all"
-                data-node-id="${node.id}"
-                data-book="${overviewModeEnabled ? node.book : currentBook}">
-                ✏️ ویرایش در صفحه اصلی
-            </button>
         </div>
     `);
 
@@ -676,21 +718,47 @@ function showLinkDetail(link, event) {
     const createdDate = link.createdAt ? new Date(link.createdAt).toLocaleString('fa-IR') : 'نامشخص';
 
     let actionButtons = '';
-    if (link.userDefined && link.id) {
+    // Only show action buttons in edit mode AND if link is user-defined
+    if (editModeEnabled && link.userDefined && link.id) {
+        // Build custom dropdown button for link type change
+        const currentTypeColor = (linkTypes[link.type] || linkTypes.default).color;
+
+        const changeTypeDropdown = `
+            <div class="relative inline-block">
+                <button class="changeLinkTypeBtn px-2 py-1 text-xs bg-amber-500 text-white rounded-lg hover:bg-amber-600 active:scale-95 transition-all flex items-center gap-1"
+                    data-link-id="${link.id}"
+                    data-current-type="${link.type}">
+                    <span class="inline-block w-2 h-2 rounded-full" style="background-color: ${currentTypeColor};"></span>
+                    <span class="type-label">${link.type}</span>
+                    <span class="text-[10px]">▼</span>
+                </button>
+            </div>
+        `;
+
         // Add reverse button for directed links
         const reverseButton = linkConfig.directed ? `
-            <button class="reverseLinkBtn inline-block px-3 py-1 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 active:scale-95 transition-all float-right mr-2"
+            <button class="reverseLinkBtn px-3 py-1 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 active:scale-95 transition-all"
                 data-link-id="${link.id}">
                 🔄 برعکس کردن
             </button>
         ` : '';
 
         actionButtons = `
-            <button class="deleteLinkBtn inline-block px-3 py-1 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600 active:scale-95 transition-all float-left"
-                data-link-id="${link.id}">
-                🗑️ حذف
-            </button>
-            ${reverseButton}
+            <div class="flex gap-2 items-center justify-between flex-wrap">
+                <button class="deleteLinkBtn px-3 py-1 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600 active:scale-95 transition-all"
+                    data-link-id="${link.id}">
+                    🗑️ حذف
+                </button>
+                ${changeTypeDropdown}
+                ${reverseButton}
+            </div>
+        `;
+    } else if (!editModeEnabled && link.userDefined) {
+        // Review mode: show message that edit mode is needed
+        actionButtons = `
+            <div class="text-xs text-slate-500 dark:text-slate-400 italic">
+                برای ویرایش یال، حالت ویرایش را فعال کنید
+            </div>
         `;
     }
 
@@ -799,6 +867,116 @@ $(document).on('click', '.deleteLinkBtn', async function (e) {
     }
 });
 
+// Handle change link type button click
+$(document).on('click', '.changeLinkTypeBtn', function (e) {
+    e.stopPropagation();
+
+    const linkId = $(this).data('link-id');
+    const currentType = $(this).data('current-type');
+    const $btn = $(this);
+
+    // Create dropdown menu
+    const dropdownId = 'linkTypeDropdown';
+
+    // Remove any existing dropdown
+    $(`#${dropdownId}`).remove();
+
+    // Build dropdown options
+    const options = Object.keys(linkTypes)
+        .filter(type => type !== 'default')
+        .map(type => {
+            const config = linkTypes[type];
+            const isSelected = type === currentType;
+            return `
+                <div class="link-type-option px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer flex items-center gap-2 transition-colors ${isSelected ? 'bg-slate-200 dark:bg-slate-600' : ''}"
+                    data-type="${type}"
+                    data-link-id="${linkId}">
+                    <span class="inline-block w-3 h-3 rounded-full" style="background-color: ${config.color};"></span>
+                    <span class="text-xs text-slate-800 dark:text-slate-200 font-medium">${type}</span>
+                    ${isSelected ? '<span class="mr-auto text-green-500">✓</span>' : ''}
+                </div>
+            `;
+        })
+        .join('');
+
+    const dropdown = $(`
+        <div id="${dropdownId}" class="absolute z-[9999] mt-1 bg-white dark:bg-slate-800 rounded-lg shadow-2xl border border-slate-200 dark:border-slate-700 max-h-60 overflow-y-auto min-w-[140px]">
+            ${options}
+        </div>
+    `);
+
+    // Position dropdown below button
+    const btnOffset = $btn.offset();
+    const btnHeight = $btn.outerHeight();
+
+    dropdown.css({
+        top: btnOffset.top + btnHeight + 4,
+        left: btnOffset.left
+    });
+
+    $('body').append(dropdown);
+
+    // Close dropdown when clicking outside
+    setTimeout(() => {
+        $(document).one('click', function () {
+            dropdown.remove();
+        });
+    }, 10);
+});
+
+// Handle link type option selection
+$(document).on('click', '.link-type-option', function (e) {
+    e.stopPropagation();
+
+    const linkId = $(this).data('link-id');
+    const newType = $(this).data('type');
+
+    if (!currentDocId) {
+        toast.error('خطا: شناسه کتاب یافت نشد');
+        return;
+    }
+
+    // Find the connection in graphConnections
+    if (!graphConnections[currentDocId]) {
+        toast.error('خطا: اتصالات یافت نشد');
+        return;
+    }
+
+    const connectionIndex = graphConnections[currentDocId].findIndex(c => c.id === linkId);
+
+    if (connectionIndex === -1) {
+        toast.error('خطا: یال یافت نشد');
+        return;
+    }
+
+    // Update the type
+    graphConnections[currentDocId][connectionIndex].type = newType;
+
+    // Save to localStorage
+    localStorage.setItem("graphConnections", JSON.stringify(graphConnections));
+
+    // Rebuild links array
+    graphData.links = graphConnections[currentDocId].map(conn => ({
+        id: conn.id,
+        source: conn.source,
+        target: conn.target,
+        type: conn.type,
+        createdAt: conn.createdAt,
+        userDefined: conn.userDefined
+    }));
+
+    updateStats();
+    renderGraph();
+
+    if (simulation) {
+        simulation.alpha(0.3).restart();
+    }
+
+    $('#linkTypeDropdown').remove();
+    $('#detailTooltip').addClass('hidden');
+    toast.success('نوع یال با موفقیت تغییر کرد');
+});
+
 // Handle reverse link button click
 $(document).on('click', '.reverseLinkBtn', function (e) {
     e.stopPropagation();
@@ -876,7 +1054,7 @@ $(document).on('click', '.editNodeBtn', function (e) {
     }));
 
     // Navigate to main page
-    window.location.href = 'index.html';
+    window.location.href = '/';
 });
 
 // Click outside tooltip to close
@@ -892,20 +1070,26 @@ $(document).on('click', function (e) {
 });
 
 $('#linkToggle').on('click', function () {
-    linkModeEnabled = !linkModeEnabled;
+    editModeEnabled = !editModeEnabled;
     const $toggle = $(this);
     const $dot = $toggle.find('span');
+    const $label = $('.edit-mode-label');
 
-    if (linkModeEnabled) {
-        $toggle.removeClass('bg-slate-300 dark:bg-slate-600').addClass('bg-blue-500');
+    if (editModeEnabled) {
+        $toggle.removeClass('bg-slate-300 dark:bg-slate-600').addClass('bg-green-500');
         $dot.addClass('-translate-x-6');
+        $label.text('حالت ویرایش');
     } else {
-        $toggle.removeClass('bg-blue-500').addClass('bg-slate-300 dark:bg-slate-600');
+        $toggle.removeClass('bg-green-500').addClass('bg-slate-300 dark:bg-slate-600');
         $dot.removeClass('-translate-x-6');
+        $label.text('حالت بازبینی');
     }
 
     selectedNodeForLink = null;
     d3.selectAll('.node').classed('selected', false);
+
+    // Hide tooltip when switching modes
+    $('#detailTooltip').addClass('hidden');
 });
 
 $('#overviewToggle').on('click', function () {
@@ -978,6 +1162,39 @@ $('#freezeToggle').on('click', function () {
         }
         $btn.text('❄️ ثابت کردن').removeClass('bg-orange-500 hover:bg-orange-600').addClass('bg-purple-500 hover:bg-purple-600');
     }
+});
+
+// Update only labels without re-rendering entire graph
+function updateLabelsOnly() {
+    // Update all node labels
+    g.selectAll('.node-label')
+        .text(d => {
+            if (showNodeId) {
+                // Show ID (truncate if too long)
+                return d.id.length > 12 ? d.id.slice(0, 12) + '...' : d.id;
+            } else {
+                // Show title
+                return d.title.slice(0, 15);
+            }
+        });
+}
+
+// Toggle label mode (ID vs Title)
+$('#labelToggle').on('click', function () {
+    showNodeId = !showNodeId;
+    const $btn = $(this);
+
+    // Update button text to show what will happen on NEXT click
+    if (showNodeId) {
+        // Currently showing IDs, next click will show titles
+        $btn.text('🏷️ نمایش عنوان');
+    } else {
+        // Currently showing titles, next click will show IDs
+        $btn.text('🆔 نمایش آیدی');
+    }
+
+    // Update labels WITHOUT moving nodes
+    updateLabelsOnly();
 });
 
 // Sync graph data with backend

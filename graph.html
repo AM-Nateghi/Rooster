@@ -73,23 +73,25 @@
                     </div>
                 </section>
 
-                <!-- Toggle Link Mode -->
+                <!-- Graph Modes Control -->
                 <section class="glass rounded-xl p-4 shadow-md">
+                    <!-- Edit/Review Mode -->
                     <div class="flex items-center justify-between mb-2">
-                        <span class="text-sm font-medium text-slate-800 dark:text-slate-200">حالت اتصال یال</span>
+                        <span class="text-sm font-medium text-slate-800 dark:text-slate-200 edit-mode-label">حالت بازبینی</span>
                         <button id="linkToggle"
                             class="relative w-12 h-6 bg-slate-300 dark:bg-slate-600 rounded-full transition-colors">
                             <span
                                 class="absolute top-1 right-1 w-4 h-4 bg-white rounded-full transition-transform duration-200"></span>
                         </button>
                     </div>
-                    <p class="text-xs text-slate-600 dark:text-slate-300">
-                        روشن: برای ایجاد یال، دو نود را انتخاب کنید
+                    <p class="text-xs text-slate-600 dark:text-slate-300 mb-3">
+                        ویرایش: ایجاد/حذف/تغییر یال‌ها | بازبینی: فقط مشاهده
                     </p>
-                </section>
 
-                <!-- Toggle Overview Mode -->
-                <section class="glass rounded-xl p-4 shadow-md">
+                    <!-- Divider -->
+                    <hr class="border-slate-300 dark:border-slate-600 my-3">
+
+                    <!-- Overview Mode -->
                     <div class="flex items-center justify-between mb-2">
                         <span class="text-sm font-medium text-slate-800 dark:text-slate-200">حالت بینش کلی</span>
                         <button id="overviewToggle"
@@ -120,6 +122,12 @@
                     <button id="freezeToggle"
                         class="absolute top-4 left-4 px-3 py-2 text-xs font-semibold text-white bg-purple-500 rounded-lg hover:bg-purple-600 active:scale-95 shadow-lg z-10">
                         ❄️ ثابت کردن
+                    </button>
+
+                    <!-- Label Mode Toggle -->
+                    <button id="labelToggle"
+                        class="absolute top-4 left-32 px-3 py-2 text-xs font-semibold text-white bg-indigo-500 rounded-lg hover:bg-indigo-600 active:scale-95 shadow-lg z-10">
+                        🆔 نمایش آیدی
                     </button>
 
                     <!-- Empty State -->

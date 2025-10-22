@@ -892,7 +892,15 @@ $(function () {
 
         try {
             const pendingEdit = JSON.parse(pendingEditStr);
-            const { book, chunkId } = pendingEdit;
+            const { book, chunkId, timestamp } = pendingEdit;
+
+            // Check if timestamp is too old (older than 5 minutes)
+            const FIVE_MINUTES = 5 * 60 * 1000;
+            if (Date.now() - timestamp > FIVE_MINUTES) {
+                console.log('Pending edit is too old, ignoring');
+                localStorage.removeItem('pendingEdit');
+                return;
+            }
 
             // Check if the book exists
             if (!entriesByTopic[book]) {
@@ -918,7 +926,7 @@ $(function () {
             // Select the chunk for editing
             select(chunkId);
 
-            // Clean up
+            // Clean up immediately to prevent reuse
             localStorage.removeItem('pendingEdit');
 
             // Show success message
@@ -937,6 +945,62 @@ $(function () {
             localStorage.removeItem('pendingEdit');
         }
     }
+
+    // Reorder chunks in current topic
+    $(document).on("click", "#reorderBtn", async function () {
+        if (!await modal.confirm(
+            `آیا از بازنشانی ترتیب چانک‌های موضوع "${currentTopic}" مطمئن هستید؟\n` +
+            `چانک‌ها بر اساس ترتیب فعلی از 1 تا n شماره‌گذاری مجدد می‌شوند.`,
+            { title: "تایید بازنشانی ترتیب" }
+        )) return;
+
+        const $btn = $("#reorderBtn");
+        const $icon = $btn.find(".reorder-icon");
+        const $text = $btn.find(".reorder-text");
+        const $spinner = $btn.find(".reorder-spinner");
+
+        $btn.prop("disabled", true).addClass("opacity-70 cursor-not-allowed");
+        $spinner.removeClass("hidden");
+        $icon.addClass("hidden");
+        $text.text("در حال بازنشانی...");
+
+        try {
+            const chunks = entriesByTopic[currentTopic] || [];
+            if (chunks.length === 0) {
+                toast.warning("هیچ چانکی برای بازنشانی وجود ندارد!");
+                return;
+            }
+
+            // Sort by current order
+            chunks.sort((a, b) => a.order - b.order);
+
+            // Re-assign orders from 1 to n
+            chunks.forEach((chunk, index) => {
+                chunk.order = index + 1;
+            });
+
+            // Update order counter
+            orderCounters[currentTopic] = chunks.length;
+
+            // Save changes
+            saveToStorage();
+            render();
+
+            toast.success(`${chunks.length} چانک با موفقیت بازنشانی شد`);
+            $text.text("بازنشانی شد ✅");
+            setTimeout(() => { $text.text("بازنشانی ترتیب چانک‌ها"); }, 1500);
+
+        } catch (err) {
+            console.error(err);
+            toast.error("خطا در بازنشانی ترتیب");
+            $text.text("خطا ❌");
+            setTimeout(() => { $text.text("بازنشانی ترتیب چانک‌ها"); }, 1500);
+        } finally {
+            $btn.prop("disabled", false).removeClass("opacity-70 cursor-not-allowed");
+            $spinner.addClass("hidden");
+            $icon.removeClass("hidden");
+        }
+    });
 
     // Initial Load
     initializeTheme();
