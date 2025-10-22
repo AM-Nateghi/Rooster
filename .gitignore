@@ -5,3 +5,4 @@ ready_book/*
 backups/*
 .vscode/*
 .deploy/*
+gemeni-data/*

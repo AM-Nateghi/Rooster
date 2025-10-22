@@ -658,6 +658,64 @@ $(function () {
 
     $("#backupBtn").on("click", createBackup);
 
+    // Import Gemini Book (JSON from Gemini output)
+    const geminiFileInput = $('<input type="file" id="importGeminiFile" accept="application/json" class="hidden" />');
+    document.body.appendChild(geminiFileInput[0]);
+
+    $(document).on("click", "#importGeminiBtn", function () {
+        geminiFileInput.trigger("click");
+    });
+
+    geminiFileInput.on("change", async function (e) {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async function () {
+            try {
+                const geminiData = JSON.parse(reader.result);
+
+                // Validate Gemini format
+                if (!geminiData.bookName || !geminiData.docId || !geminiData.chunks) {
+                    throw new Error("فرمت فایل Gemini نامعتبر است. فیلدهای bookName، docId و chunks الزامی است.");
+                }
+
+                // First sync current state with backend
+                await syncWithBackendSilent();
+
+                // Send to backend endpoint
+                const res = await fetch("http://localhost:8000/import_gemini_book", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(geminiData)
+                });
+
+                if (!res.ok) {
+                    const error = await res.json();
+                    throw new Error(error.detail || "خطا در افزودن کتاب");
+                }
+
+                const result = await res.json();
+
+                // Reload data from backend
+                await restoreFromBackend();
+
+                toast.success(
+                    `${result.message}\n` +
+                    `📊 تعداد چانک‌ها: ${result.chunksCount}\n` +
+                    `🔗 تعداد روابط: ${result.graphConnectionsCount}`
+                );
+
+            } catch (err) {
+                console.error(err);
+                toast.error(err.message || "خطا در افزودن کتاب از Gemini");
+            } finally {
+                geminiFileInput.val("");
+            }
+        };
+        reader.readAsText(file, "utf-8");
+    });
+
     // Import from file (JSON)
     const fileInput = $('<input type="file" id="importFile" accept="application/json" class="hidden" />');
     document.body.appendChild(fileInput[0]);

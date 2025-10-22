@@ -328,6 +328,137 @@ def import_all_data(payload: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+@app.post("/import_gemini_book")
+def import_gemini_book(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Import a book from Gemini JSON output format.
+
+    Expected JSON format from Gemini:
+    {
+      "bookName": "عیار تجربه",
+      "docId": "doc_X34puN99",
+      "chunks": [
+        {"id": "abc", "order": 1, "input": "...", "output": ""}
+      ],
+      "graphConnections": {
+        "doc_X34puN99": [
+          {"id": "link_123", "source": "abc", "target": "def", ...}
+        ]
+      }
+    }
+    """
+    # Validate required fields
+    book_name = payload.get("bookName")
+    doc_id = payload.get("docId")
+    chunks = payload.get("chunks", [])
+    graph_connections = payload.get("graphConnections", {})
+
+    if not book_name:
+        raise HTTPException(status_code=400, detail="فیلد bookName الزامی است")
+    if not doc_id:
+        raise HTTPException(status_code=400, detail="فیلد docId الزامی است")
+    if not chunks:
+        raise HTTPException(status_code=400, detail="فیلد chunks نمی‌تواند خالی باشد")
+
+    # Sanitize book name for filename
+    safe_name = (
+        "".join(c for c in book_name if c.isalnum() or c in ("-", "_", " "))
+        .strip()
+        .replace(" ", "_")
+    )
+    if not safe_name:
+        safe_name = "book"
+
+    # Create directories
+    JSON_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    GRAPH_DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Save chunks to json_data/<book_name>.json
+    book_file_path = JSON_DATA_DIR / f"{safe_name}.json"
+    with book_file_path.open("w", encoding="utf-8") as f:
+        json.dump(chunks, f, ensure_ascii=False, indent=2)
+
+    # Find max order for orderCounter
+    max_order = max(chunk.get("order", 0) for chunk in chunks) if chunks else 0
+
+    # Update manifest.json
+    manifest_path = JSON_DATA_DIR / "manifest.json"
+    if manifest_path.exists():
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    else:
+        manifest = {
+            "currentTopic": None,
+            "orderCounters": {},
+            "topicMeta": {},
+            "booksMeta": {},
+            "topics": [],
+            "files": []
+        }
+
+    # Add book metadata
+    manifest["booksMeta"][book_name] = {
+        "id": doc_id,
+        "name": book_name,
+        "created": int(time.time() * 1000)  # timestamp in milliseconds
+    }
+
+    # Update topics and files
+    if book_name not in manifest["topics"]:
+        manifest["topics"].append(book_name)
+    if f"{safe_name}.json" not in manifest["files"]:
+        manifest["files"].append(f"{safe_name}.json")
+
+    # Update order counter
+    manifest["orderCounters"][book_name] = max_order
+
+    # Set as current topic if it's the first book
+    if not manifest.get("currentTopic"):
+        manifest["currentTopic"] = book_name
+
+    # Save manifest
+    with manifest_path.open("w", encoding="utf-8") as f:
+        json.dump(manifest, f, ensure_ascii=False, indent=2)
+
+    # Save graph connections
+    graph_data_path = GRAPH_DATA_DIR / "graph_data.json"
+    if graph_data_path.exists():
+        graph_data = json.loads(graph_data_path.read_text(encoding="utf-8"))
+    else:
+        graph_data = {
+            "booksMeta": {},
+            "graphConnections": {},
+            "lastSync": {}
+        }
+
+    # Update graph data
+    graph_data["booksMeta"][book_name] = {
+        "id": doc_id,
+        "name": book_name,
+        "created": int(time.time() * 1000)
+    }
+
+    # Merge graph connections
+    if graph_connections:
+        if doc_id not in graph_data["graphConnections"]:
+            graph_data["graphConnections"][doc_id] = []
+
+        # Replace existing connections for this docId
+        graph_data["graphConnections"][doc_id] = graph_connections.get(doc_id, [])
+
+    # Save graph data
+    with graph_data_path.open("w", encoding="utf-8") as f:
+        json.dump(graph_data, f, ensure_ascii=False, indent=2)
+
+    return {
+        "status": "ok",
+        "message": f"کتاب «{book_name}» با موفقیت اضافه شد",
+        "bookName": book_name,
+        "docId": doc_id,
+        "chunksCount": len(chunks),
+        "graphConnectionsCount": len(graph_connections.get(doc_id, [])),
+        "filePath": str(book_file_path.name)
+    }
+
+
 @app.post("/backup")
 def create_backup() -> Dict[str, Any]:
     """Create a ZIP backup of all data in json_data directory.
