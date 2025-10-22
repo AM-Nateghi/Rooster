@@ -6,6 +6,7 @@ let graphConnections = {};
 let currentBook = null;
 let currentDocId = null;
 let linkModeEnabled = false;
+let overviewModeEnabled = false; // Overview mode state
 let selectedNodeForLink = null;
 let simulation = null;
 let nodePositions = {}; // Store node positions to preserve them between renders
@@ -50,6 +51,21 @@ const nodeColors = {
     'مرجع': '#f59e0b',
     default: '#64748b'
 };
+
+// Generate consistent color for book name (for overview mode)
+function getBookColor(bookName) {
+    // Hash the book name to get a consistent number
+    let hash = 0;
+    for (let i = 0; i < bookName.length; i++) {
+        hash = bookName.charCodeAt(i) + ((hash << 5) - hash);
+    }
+
+    // Convert to hue (0-360)
+    const hue = Math.abs(hash % 360);
+
+    // Return HSL color with good saturation and lightness
+    return `hsl(${hue}, 70%, 50%)`;
+}
 
 // Helper functions for ID generation
 function randomLinkId() {
@@ -167,10 +183,12 @@ function loadDataFromStorage() {
         if (Object.keys(entriesByTopic).length > 0) {
             renderBookList();
 
-            // Select first book by default
-            const firstBook = Object.keys(entriesByTopic)[0];
-            if (firstBook) {
-                selectBook(firstBook);
+            // Try to restore previously selected book, otherwise select first book
+            const savedBook = localStorage.getItem('currentGraphBook');
+            const bookToSelect = (savedBook && entriesByTopic[savedBook]) ? savedBook : Object.keys(entriesByTopic)[0];
+
+            if (bookToSelect) {
+                selectBook(bookToSelect);
             }
 
             $('#emptyState').hide();
@@ -210,6 +228,9 @@ $(document).on('click', '.book-item', function () {
 function selectBook(book) {
     currentBook = book;
 
+    // Save selected book to localStorage
+    localStorage.setItem('currentGraphBook', book);
+
     // Get doc_id for this book
     currentDocId = booksMeta[book]?.id || null;
 
@@ -224,7 +245,8 @@ function selectBook(book) {
         title: e.input.slice(0, 50) + (e.input.length > 50 ? '...' : ''),
         fullText: e.input,
         type: e.instruct || 'default',
-        order: e.order
+        order: e.order,
+        book: book  // Add book reference for overview mode
     }));
 
     // Load real connections from localStorage (NO MORE DEMO LINKS!)
@@ -254,6 +276,49 @@ function selectBook(book) {
             console.warn(`⚠️ Removed ${cleanedCount} invalid connection(s) with missing nodes`);
         }
     }
+
+    updateStats();
+    renderGraph();
+}
+
+function renderOverview() {
+    // Collect all nodes from all books
+    graphData.nodes = [];
+    const allNodeIds = new Set();
+
+    Object.keys(entriesByTopic).forEach(book => {
+        const entries = entriesByTopic[book] || [];
+        entries.forEach(e => {
+            graphData.nodes.push({
+                id: e.id,
+                title: e.input.slice(0, 50) + (e.input.length > 50 ? '...' : ''),
+                fullText: e.input,
+                type: e.instruct || 'default',
+                order: e.order,
+                book: book  // Store book name for color coding
+            });
+            allNodeIds.add(e.id);
+        });
+    });
+
+    // Collect all connections from all books
+    graphData.links = [];
+    Object.keys(graphConnections).forEach(docId => {
+        const connections = graphConnections[docId] || [];
+        connections.forEach(conn => {
+            // Only include connections where both nodes exist
+            if (allNodeIds.has(conn.source) && allNodeIds.has(conn.target)) {
+                graphData.links.push({
+                    id: conn.id,
+                    source: conn.source,
+                    target: conn.target,
+                    type: conn.type,
+                    createdAt: conn.createdAt,
+                    userDefined: conn.userDefined
+                });
+            }
+        });
+    });
 
     updateStats();
     renderGraph();
@@ -379,7 +444,13 @@ function renderGraph() {
 
     node.append('circle')
         .attr('r', 14)
-        .attr('fill', d => nodeColors[d.type] || nodeColors.default);
+        .attr('fill', d => {
+            // In overview mode, color by book; otherwise by type
+            if (overviewModeEnabled && d.book) {
+                return getBookColor(d.book);
+            }
+            return nodeColors[d.type] || nodeColors.default;
+        });
 
     // Add order number inside the circle
     node.append('text')
@@ -548,7 +619,20 @@ function showNodeDetail(node, event) {
         : node.fullText;
 
     $('#detailTitle').text('جزئیات نود');
+
+    // Build book info HTML (show in overview mode)
+    const bookInfo = overviewModeEnabled && node.book ? `
+        <div>
+            <div class="font-semibold">کتاب:</div>
+            <div class="text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                <span class="inline-block w-3 h-3 rounded-full" style="background-color: ${getBookColor(node.book)};"></span>
+                <span>${node.book}</span>
+            </div>
+        </div>
+    ` : '';
+
     $('#detailContent').html(`
+        ${bookInfo}
         <div>
             <div class="font-semibold">شناسه:</div>
             <div class="text-slate-800 dark:text-slate-200">${node.id}</div>
@@ -564,6 +648,13 @@ function showNodeDetail(node, event) {
         <div>
             <div class="font-semibold">خلاصه متن:</div>
             <div class="text-slate-800 dark:text-slate-200 leading-relaxed text-justify">${displayText}</div>
+        </div>
+        <div class="mt-3">
+            <button class="editNodeBtn w-full px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 active:scale-95 transition-all"
+                data-node-id="${node.id}"
+                data-book="${overviewModeEnabled ? node.book : currentBook}">
+                ✏️ ویرایش در صفحه اصلی
+            </button>
         </div>
     `);
 
@@ -770,6 +861,24 @@ $(document).on('click', '.reverseLinkBtn', function (e) {
     toast.success('جهت یال با موفقیت برعکس شد');
 });
 
+// Handle edit node button click
+$(document).on('click', '.editNodeBtn', function (e) {
+    e.stopPropagation();
+
+    const nodeId = $(this).data('node-id');
+    const book = $(this).data('book');
+
+    // Save edit request to localStorage
+    localStorage.setItem('pendingEdit', JSON.stringify({
+        book: book,
+        chunkId: nodeId,
+        timestamp: Date.now()
+    }));
+
+    // Navigate to main page
+    window.location.href = 'index.html';
+});
+
 // Click outside tooltip to close
 $(document).on('click', function (e) {
     const $tooltip = $('#detailTooltip');
@@ -799,8 +908,57 @@ $('#linkToggle').on('click', function () {
     d3.selectAll('.node').classed('selected', false);
 });
 
+$('#overviewToggle').on('click', function () {
+    overviewModeEnabled = !overviewModeEnabled;
+    const $toggle = $(this);
+    const $dot = $toggle.find('span');
+    const $bookList = $('#bookList');
+
+    if (overviewModeEnabled) {
+        // Enable overview mode
+        $toggle.removeClass('bg-slate-300 dark:bg-slate-600').addClass('bg-green-500');
+        $dot.addClass('-translate-x-6');
+
+        // Disable book selection
+        $('.book-item').addClass('opacity-50 pointer-events-none');
+
+        // Render overview
+        renderOverview();
+    } else {
+        // Disable overview mode
+        $toggle.removeClass('bg-green-500').addClass('bg-slate-300 dark:bg-slate-600');
+        $dot.removeClass('-translate-x-6');
+
+        // Enable book selection
+        $('.book-item').removeClass('opacity-50 pointer-events-none');
+
+        // Return to selected book view
+        if (currentBook && entriesByTopic[currentBook]) {
+            selectBook(currentBook);
+        } else {
+            // If no book was selected, select the first one
+            const firstBook = Object.keys(entriesByTopic)[0];
+            if (firstBook) {
+                selectBook(firstBook);
+            }
+        }
+    }
+});
+
 $('#refreshData').on('click', function () {
+    const wasOverviewMode = overviewModeEnabled;
     loadDataFromStorage();
+
+    // Restore overview mode if it was active
+    if (wasOverviewMode) {
+        // Need to wait for loadDataFromStorage to complete
+        setTimeout(() => {
+            if (!overviewModeEnabled) {
+                // Manually trigger overview mode
+                $('#overviewToggle').click();
+            }
+        }, 100);
+    }
 });
 
 // Freeze/unfreeze simulation

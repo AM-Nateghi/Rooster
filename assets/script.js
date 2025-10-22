@@ -227,7 +227,20 @@ $(function () {
     $("#deleteBtn").on("click", async function () {
         if (!selectedId) return;
         if (!await modal.confirm("آیا از حذف این آیتم مطمئن هستید؟", { title: "تایید حذف" })) return;
+
+        // Remove the selected chunk
         entriesByTopic[currentTopic] = entriesByTopic[currentTopic].filter(e => e.id !== selectedId);
+
+        // Re-order remaining chunks from 1 to n
+        const remainingChunks = entriesByTopic[currentTopic];
+        remainingChunks.sort((a, b) => a.order - b.order); // Sort by old order first
+        remainingChunks.forEach((chunk, index) => {
+            chunk.order = index + 1;
+        });
+
+        // Update order counter
+        orderCounters[currentTopic] = remainingChunks.length;
+
         saveToStorage();
         reset();
         render();
@@ -872,9 +885,63 @@ $(function () {
         }
     });
 
+    // Check for pending edit request from graph page
+    function handlePendingEdit() {
+        const pendingEditStr = localStorage.getItem('pendingEdit');
+        if (!pendingEditStr) return;
+
+        try {
+            const pendingEdit = JSON.parse(pendingEditStr);
+            const { book, chunkId } = pendingEdit;
+
+            // Check if the book exists
+            if (!entriesByTopic[book]) {
+                toast.warning(`کتاب "${book}" یافت نشد`);
+                localStorage.removeItem('pendingEdit');
+                return;
+            }
+
+            // Switch to the target book
+            currentTopic = book;
+            saveToStorage();
+            renderTabs();
+            render();
+
+            // Find and select the chunk
+            const chunk = entriesByTopic[book].find(e => e.id === chunkId);
+            if (!chunk) {
+                toast.warning(`چانک مورد نظر یافت نشد`);
+                localStorage.removeItem('pendingEdit');
+                return;
+            }
+
+            // Select the chunk for editing
+            select(chunkId);
+
+            // Clean up
+            localStorage.removeItem('pendingEdit');
+
+            // Show success message
+            toast.success('چانک در حالت ویرایش بارگذاری شد');
+
+            // Scroll to the selected card
+            setTimeout(() => {
+                const $card = $(`.glass-card[data-id='${chunkId}']`);
+                if ($card.length) {
+                    $card[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 100);
+
+        } catch (err) {
+            console.error('Error handling pending edit:', err);
+            localStorage.removeItem('pendingEdit');
+        }
+    }
+
     // Initial Load
     initializeTheme();
     ensureTopicIds();
     renderTabs();
     render();
+    handlePendingEdit();
 });
