@@ -67,7 +67,12 @@
 
 /* Light mode background polish (warmer/cream) */
 body:not(.dark) {
-    background: linear-gradient(180deg, #fff8ed 0%, #f8efe4 100%);
+    background: linear-gradient(180deg, #fff8ed 0%, #f8efe4 100%) !important;
+}
+
+/* Dark mode background */
+body.dark {
+    background: #0f172a !important;
 }
 
 /* Light mode textarea readability */
@@ -78,6 +83,17 @@ body:not(.dark) #inputText {
 
 body:not(.dark) #inputText::placeholder {
     color: #7a6d5a;
+}
+
+/* Dark mode textarea */
+body.dark #inputText {
+    background: rgba(30, 41, 59, 0.5) !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(71, 85, 105, 0.5) !important;
+}
+
+body.dark #inputText::placeholder {
+    color: #94a3b8;
 }
 
 /* Warm glass surfaces in light mode */
