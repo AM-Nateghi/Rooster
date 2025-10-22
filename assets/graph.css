@@ -1,45 +1,10 @@
-/* Glassmorphism styles matching original design */
-.glass {
-    background: rgba(255, 255, 255, 0.78);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(15, 23, 42, 0.08);
-    transition: background-color 0.3s, border-color 0.3s;
-}
+/* ===========================================
+   GRAPH PAGE SPECIFIC STYLES
+   Using Tailwind-first approach
+   Only D3.js and graph-specific styles
+   =========================================== */
 
-.dark .glass {
-    background: rgba(30, 41, 59, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.glass-card {
-    background: rgba(255, 255, 255, 0.85);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 1px solid rgba(15, 23, 42, 0.08);
-    transition: all 0.2s ease-in-out;
-}
-
-.dark .glass-card {
-    background: rgba(51, 65, 85, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* Light mode background polish (warmer/cream) */
-body:not(.dark) {
-    background: linear-gradient(180deg, #fff8ed 0%, #f8efe4 100%);
-}
-
-body.dark {
-    background: #0f172a;
-}
-
-/* General transitions for a smoother experience */
-* {
-    transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s;
-}
-
-/* Node and link styles */
+/* D3.js Node Styles */
 .node {
     cursor: pointer;
 }
@@ -60,10 +25,11 @@ body.dark {
     stroke-width: 4px;
 }
 
+/* D3.js Link Styles */
 .link {
     stroke-opacity: 0.7;
-    transition: all 0.2s;
     fill: none;
+    transition: all 0.2s;
 }
 
 .link:hover {
@@ -83,11 +49,12 @@ body.dark {
     stroke-width: 3px !important;
 }
 
-/* Undirected links (bidirectional) - dashed style */
+/* Undirected links - dashed style */
 .link.undirected {
     stroke-dasharray: 5, 5;
 }
 
+/* D3.js Node Label Styles */
 .node-label {
     font-size: 10px;
     font-weight: 600;
@@ -102,16 +69,16 @@ body.dark {
     text-shadow: 0 0 3px #0f172a, 0 0 3px #0f172a;
 }
 
-/* Book item hover effect */
-.book-item {
-    transition: transform 0.2s, box-shadow 0.2s;
+/* Graph Container Background */
+#graph-container {
+    background: rgba(255, 255, 255, 0.3);
 }
 
-.book-item:hover {
-    transform: translateX(-3px);
+.dark #graph-container {
+    background: rgba(15, 23, 42, 0.3);
 }
 
-/* Scrollbar matching original */
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
     width: 8px;
     height: 4px;
@@ -130,49 +97,7 @@ body.dark {
     background: rgba(59, 130, 246, 0.4);
 }
 
-/* Graph container */
-#graph-container {
-    background: rgba(255, 255, 255, 0.3);
-}
-
-.dark #graph-container {
-    background: rgba(15, 23, 42, 0.3);
-}
-
-/* Light mode warm surfaces */
-body:not(.dark) .glass {
-    background: rgba(255, 252, 245, 0.82);
-    border-color: rgba(125, 110, 90, 0.15);
-}
-
-body:not(.dark) .glass-card {
-    background: rgba(255, 248, 235, 0.9);
-    border-color: rgba(125, 110, 90, 0.18);
-}
-
-/* Light mode text colors */
-body:not(.dark) .book-item {
-    color: #2f2c28;
-}
-
-body:not(.dark) #bookList h3 {
-    color: #3b352d;
-}
-
-/* Fix light mode text visibility */
-body:not(.dark) h1 {
-    color: #1e293b !important;
-}
-
-body:not(.dark) .text-slate-800 {
-    color: #1e293b !important;
-}
-
-body:not(.dark) .book-item span {
-    color: #334155 !important;
-}
-
-/* Detail Tooltip Styles */
+/* Detail Tooltip (complex glassmorphism not achievable with Tailwind) */
 #detailTooltip {
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
@@ -182,30 +107,6 @@ body:not(.dark) .book-item span {
 }
 
 .dark #detailTooltip {
-    background: rgba(30, 41, 59, 0.92) !important;
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
-}
-
-#detailTooltip .font-semibold {
-    color: #64748b !important;
-}
-
-.dark #detailTooltip .font-semibold {
-    color: #94a3b8 !important;
-}
-
-#detailTooltip .text-gray-900 {
-    color: #1e293b !important;
-}
-
-.dark #detailTooltip .text-gray-900 {
-    color: #e2e8f0 !important;
-}
-
-#detailTooltip .text-gray-600 {
-    color: #475569 !important;
-}
-
-.dark #detailTooltip .text-gray-600 {
-    color: #94a3b8 !important;
+    background: rgba(30, 41, 59, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.15);
 }
