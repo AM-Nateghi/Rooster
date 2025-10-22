@@ -23,11 +23,11 @@ OPTIONAL_DIRS = ["json_data", "backups"]
 PORT = 8014
 
 # Deployment directory
-DEPLOY_DIR = Path(".deploy")
+DEPLOY_DIR = Path("deploy")
 
 
 def ensure_deploy_dir():
-    """Ensure .deploy directory exists"""
+    """Ensure deploy directory exists"""
     DEPLOY_DIR.mkdir(exist_ok=True)
     print(f"✓ Using deployment directory: {DEPLOY_DIR}")
 
@@ -405,7 +405,7 @@ def create_build_package():
         (package_dir / dir_name).mkdir(exist_ok=True)
         print(f"  ✓ Created {dir_name}/")
 
-    # Copy deployment files from .deploy directory
+    # Copy deployment files from deploy directory
     for file in [
         "requirements.txt",
         "config.py",
@@ -459,7 +459,7 @@ def create_build_package():
     readme_path = package_dir / "README_DEPLOY.md"
     readme_path.write_text(readme_content, encoding='utf-8')
 
-    # Create ZIP archive in .deploy directory
+    # Create ZIP archive in deploy directory
     zip_path = DEPLOY_DIR / f"{package_name}.zip"
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
         for file_path in package_dir.rglob("*"):
@@ -467,11 +467,10 @@ def create_build_package():
                 arcname = file_path.relative_to(package_dir.parent)
                 zipf.write(file_path, arcname)
 
-    # Clean up directory (optional - keep it for inspection)
-    # shutil.rmtree(package_dir)
+    # Clean up directory to avoid showing it alongside the ZIP
+    shutil.rmtree(package_dir)
 
     print(f"\n✅ Deployment package created: {zip_path}")
-    print(f"📁 Package directory: {package_dir}/")
     return zip_path
 
 
@@ -508,13 +507,9 @@ def main():
         print("\n✅ Deployment files ready!")
 
     print("\n📚 Next steps:")
-    print(f"  All files are in the '{DEPLOY_DIR}/' directory")
-    print("  1. Copy package to your server")
-    if platform.system() == "Windows":
-        print("  2. Run: setup.bat (Windows)")
-    else:
-        print("  2. Run: bash setup.sh (Unix/Linux/macOS)")
-    print("  3. Run: python run_production.py")
+    print(f"  Find your deployment package in the '{DEPLOY_DIR}/' directory")
+    print("  1. Copy the ZIP file to your server and extract it")
+    print("  2. Run: python run_production.py")
     print("\n  Or use Docker: docker-compose up -d")
 
 
