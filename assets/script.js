@@ -118,14 +118,22 @@ $(function () {
                 const preview = e.input.slice(0, 30);
                 const words = getWordCount(e.input);
                 const card = $(`
-                    <div class="glass-card p-3 rounded-lg cursor-pointer hover:shadow-lg transition-all" data-id="${e.id}">
+                    <div class="glass-card p-3 rounded-lg cursor-pointer hover:shadow-lg transition-all relative chunk-card" data-id="${e.id}">
                         <div class="flex justify-between items-center mb-2">
                             <span class="text-xs font-mono text-slate-600 dark:text-slate-400">${e.id}</span>
                             <span class="text-xs text-slate-500 dark:text-slate-500 font-semibold">#${e.order}</span>
                         </div>
                         <p class="text-sm text-slate-800 dark:text-slate-100 h-10 overflow-hidden text-ellipsis">${preview}</p>
-                        <div class="flex justify-end items-center mt-2">
+                        <div class="flex justify-start items-center mt-2">
                             <span class="px-2 py-0.5 rounded-full text-xs font-bold text-white ${badgeColor(words)}">${words} کلمه</span>
+                        </div>
+                        <div class="chunk-insert-buttons absolute bottom-2 left-2 hidden gap-1 flex-row justify-end">
+                            <button class="insert-before-btn px-1 py-1 text-xs rounded-full bg-white/80 dark:bg-slate-700/80 text-slate-700 dark:text-slate-200 transition-all active:scale-95 border border-slate-300 dark:border-slate-600" data-chunk-id="${e.id}" title="افزودن چانک قبل از این">
+                                ➕ قبل
+                            </button>
+                            <button class="insert-after-btn px-1 py-1 text-xs rounded-full bg-white/80 dark:bg-slate-700/80 text-slate-700 dark:text-slate-200 transition-all active:scale-95 border border-slate-300 dark:border-slate-600" data-chunk-id="${e.id}" title="افزودن چانک بعد از این">
+                                ➕ بعد
+                            </button>
                         </div>
                     </div>
                 `);
@@ -356,9 +364,84 @@ $(function () {
         }
     });
 
-    $(document).on("click", ".glass-card[data-id]", function () {
+    $(document).on("click", ".glass-card[data-id]", function (e) {
+        // Don't select if clicking on insert buttons
+        if ($(e.target).closest('.chunk-insert-buttons').length > 0) {
+            return;
+        }
         select($(this).data("id"));
     });
+
+    // Insert chunk before
+    $(document).on("click", ".insert-before-btn", function (e) {
+        e.stopPropagation();
+        const targetChunkId = $(this).data("chunk-id");
+        insertChunkRelativeTo(targetChunkId, "before");
+    });
+
+    // Insert chunk after
+    $(document).on("click", ".insert-after-btn", function (e) {
+        e.stopPropagation();
+        const targetChunkId = $(this).data("chunk-id");
+        insertChunkRelativeTo(targetChunkId, "after");
+    });
+
+    function insertChunkRelativeTo(targetChunkId, position) {
+        const chunks = entriesByTopic[currentTopic] || [];
+        const targetChunk = chunks.find(c => c.id === targetChunkId);
+        if (!targetChunk) {
+            toast.error("چانک مورد نظر یافت نشد");
+            return;
+        }
+
+        // Calculate new order value
+        let newOrder;
+        if (position === "before") {
+            // Find chunk with order just before target
+            const sortedChunks = chunks.filter(c => c.order < targetChunk.order).sort((a, b) => b.order - a.order);
+            const previousChunk = sortedChunks[0];
+
+            if (previousChunk) {
+                // Insert between previous and target
+                newOrder = (previousChunk.order + targetChunk.order) / 2;
+            } else {
+                // No chunk before, insert before first
+                newOrder = targetChunk.order - 1;
+            }
+        } else {
+            // Insert after
+            const sortedChunks = chunks.filter(c => c.order > targetChunk.order).sort((a, b) => a.order - b.order);
+            const nextChunk = sortedChunks[0];
+
+            if (nextChunk) {
+                // Insert between target and next
+                newOrder = (targetChunk.order + nextChunk.order) / 2;
+            } else {
+                // No chunk after, insert after last
+                newOrder = targetChunk.order + 1;
+            }
+        }
+
+        // Create new chunk
+        const newChunk = {
+            id: randomId(),
+            order: newOrder,
+            instruct: "This is a default instruction.",
+            input: "",
+            output: ""
+        };
+
+        chunks.push(newChunk);
+        saveToStorage();
+        render();
+        renderTabs();
+
+        // Auto-select the new chunk for editing
+        select(newChunk.id);
+
+        const positionText = position === "before" ? "قبل از" : "بعد از";
+        toast.success(`چانک جدید ${positionText} چانک #${targetChunk.order} ایجاد شد`);
+    }
 
     async function openExportModal() {
         const topics = Object.keys(entriesByTopic);

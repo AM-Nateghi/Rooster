@@ -68,3 +68,14 @@
 .dark #tabs::-webkit-scrollbar-thumb:hover {
     background: rgba(59, 130, 246, 0.6);
 }
+
+/* Chunk card insert buttons - show on hover */
+.chunk-card .chunk-insert-buttons {
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+}
+
+.chunk-card:hover .chunk-insert-buttons {
+    opacity: 1;
+    display: flex !important;
+}
