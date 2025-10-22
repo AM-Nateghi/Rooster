@@ -79,3 +79,83 @@
     opacity: 1;
     display: flex !important;
 }
+
+/* Depth input - Material Design inspired floating label */
+.depth-input-wrapper {
+    position: relative;
+    width: 80px;
+}
+
+.depth-input {
+    width: 100%;
+    padding: 8px 6px 4px 6px;
+    font-size: 12px;
+    border: 1px solid rgba(100, 116, 139, 0.3);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.95);
+    color: #1e293b;
+    outline: none;
+    transition: all 0.2s ease;
+    /* Remove number input arrows */
+    -moz-appearance: textfield;
+}
+
+.depth-input::-webkit-outer-spin-button,
+.depth-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.depth-input:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    background: rgba(255, 255, 255, 1);
+}
+
+.depth-label {
+    position: absolute;
+    top: 9px;
+    right: 6px;
+    font-size: 12px;
+    color: #64748b;
+    pointer-events: none;
+    transition: all 0.2s ease;
+    background: transparent;
+    padding: 0 2px;
+}
+
+/* Floating label when focused or has value */
+.depth-input:focus + .depth-label,
+.depth-input:not(:placeholder-shown) + .depth-label {
+    top: -10px;
+    right: 6px;
+    font-size: 10px;
+    color: #3b82f6;
+    background: rgba(255, 255, 255, 0.98);
+    padding: 0 4px;
+    font-weight: 600;
+    line-height: 1;
+}
+
+/* Dark mode styles for depth input */
+.dark .depth-input {
+    background: rgba(51, 65, 85, 0.95);
+    color: #e2e8f0;
+    border-color: rgba(148, 163, 184, 0.3);
+}
+
+.dark .depth-input:focus {
+    border-color: #3b82f6;
+    background: rgba(51, 65, 85, 1);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.dark .depth-label {
+    color: #94a3b8;
+}
+
+.dark .depth-input:focus + .depth-label,
+.dark .depth-input:not(:placeholder-shown) + .depth-label {
+    color: #60a5fa;
+    background: rgba(51, 65, 85, 0.98);
+}

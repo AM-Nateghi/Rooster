@@ -245,8 +245,8 @@ function selectBook(book) {
         id: e.id,
         title: e.input.slice(0, 50) + (e.input.length > 50 ? '...' : ''),
         fullText: e.input,
-        type: e.instruct || 'default',
         order: e.order,
+        depth: e.depth,
         book: book  // Add book reference for overview mode
     }));
 
@@ -294,8 +294,8 @@ function renderOverview() {
                 id: e.id,
                 title: e.input.slice(0, 50) + (e.input.length > 50 ? '...' : ''),
                 fullText: e.input,
-                type: e.instruct || 'default',
                 order: e.order,
+                depth: e.depth,
                 book: book  // Store book name for color coding
             });
             allNodeIds.add(e.id);
@@ -478,13 +478,26 @@ function renderGraph() {
         .on('click', handleNodeClick);
 
     node.append('circle')
-        .attr('r', 14)
+        .attr('r', d => {
+            // Size based on depth: 5 levels (1-5), 8px reduction per level
+            if (d.depth !== undefined && d.depth !== null && d.depth >= 1) {
+                const maxRadius = 45;  // depth = 1
+                const reductionPerLevel = 8;
+                const minRadius = 13;  // depth = 5+
+
+                // Clamp depth to max 5 levels
+                const effectiveDepth = Math.min(d.depth, 5);
+
+                return Math.max(minRadius, maxRadius - ((effectiveDepth - 1) * reductionPerLevel));
+            }
+            return 14; // Default size for nodes without depth
+        })
         .attr('fill', d => {
-            // In overview mode, color by book; otherwise by type
+            // In overview mode, color by book; otherwise default color
             if (overviewModeEnabled && d.book) {
                 return getBookColor(d.book);
             }
-            return nodeColors[d.type] || nodeColors.default;
+            return nodeColors.default;
         });
 
     // Add order number inside the circle
@@ -670,13 +683,26 @@ function showNodeDetail(node, event) {
     ` : '';
 
     $('#detailTitle').html(`
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between gap-2">
             <span>جزئیات نود</span>
-            <button class="editNodeBtn px-3 py-1 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 active:scale-95 transition-all"
-                data-node-id="${node.id}"
-                data-book="${overviewModeEnabled ? node.book : currentBook}">
-                ✏️ ویرایش
-            </button>
+            <div class="flex items-center gap-2">
+                <div class="depth-input-wrapper">
+                    <input type="number"
+                           class="depth-input node-depth-input"
+                           placeholder=" "
+                           value="${node.depth || ''}"
+                           data-node-id="${node.id}"
+                           data-book="${overviewModeEnabled ? node.book : currentBook}"
+                           min="1"
+                           max="10">
+                    <label class="depth-label">عمق</label>
+                </div>
+                <button class="editNodeBtn px-3 py-1 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 active:scale-95 transition-all"
+                    data-node-id="${node.id}"
+                    data-book="${overviewModeEnabled ? node.book : currentBook}">
+                    ✏️ ویرایش
+                </button>
+            </div>
         </div>
     `);
 
@@ -685,14 +711,6 @@ function showNodeDetail(node, event) {
         <div>
             <div class="font-semibold">شناسه:</div>
             <div class="text-slate-800 dark:text-slate-200">${node.id}</div>
-        </div>
-        <div>
-            <div class="font-semibold">نوع:</div>
-            <div class="text-slate-800 dark:text-slate-200">${node.type}</div>
-        </div>
-        <div>
-            <div class="font-semibold">ترتیب:</div>
-            <div class="text-slate-800 dark:text-slate-200">#${node.order}</div>
         </div>
         <div>
             <div class="font-semibold">خلاصه متن:</div>
@@ -1037,6 +1055,73 @@ $(document).on('click', '.reverseLinkBtn', function (e) {
     }
 
     toast.success('جهت یال با موفقیت برعکس شد');
+});
+
+// Handle depth input change in tooltip
+$(document).on('change blur', '.node-depth-input', function () {
+    const nodeId = $(this).data('node-id');
+    const book = $(this).data('book');
+    const depthValue = $(this).val();
+
+    // Find the node in entriesByTopic
+    if (entriesByTopic[book]) {
+        const chunk = entriesByTopic[book].find(c => c.id === nodeId);
+        if (chunk) {
+            // Update or remove depth
+            if (depthValue && parseInt(depthValue) >= 1) {
+                chunk.depth = parseInt(depthValue);
+            } else {
+                delete chunk.depth;
+            }
+
+            // Save to localStorage
+            localStorage.setItem('entriesByTopic', JSON.stringify(entriesByTopic));
+
+            // Update the node in graphData
+            const graphNode = graphData.nodes.find(n => n.id === nodeId);
+            if (graphNode) {
+                if (depthValue && parseInt(depthValue) >= 1) {
+                    graphNode.depth = parseInt(depthValue);
+                } else {
+                    delete graphNode.depth;
+                }
+
+                // Update node size directly without re-rendering entire graph
+                let newRadius;
+                if (graphNode.depth !== undefined && graphNode.depth !== null && graphNode.depth >= 1) {
+                    const maxRadius = 45;  // depth = 1
+                    const reductionPerLevel = 8;
+                    const minRadius = 13;  // depth = 5+
+
+                    // Clamp depth to max 5 levels
+                    const effectiveDepth = Math.min(graphNode.depth, 5);
+
+                    newRadius = Math.max(minRadius, maxRadius - ((effectiveDepth - 1) * reductionPerLevel));
+                } else {
+                    newRadius = 14; // Default size for nodes without depth
+                }
+
+                // Update the circle radius using D3 and also update d.depth
+                d3.selectAll('.node').each(function(d) {
+                    if (d.id === nodeId) {
+                        // Update the depth in the bound data
+                        if (depthValue && parseInt(depthValue) >= 1) {
+                            d.depth = parseInt(depthValue);
+                        } else {
+                            delete d.depth;
+                        }
+
+                        d3.select(this).select('circle')
+                            .transition()
+                            .duration(300)
+                            .attr('r', newRadius);
+                    }
+                });
+            }
+
+            // Don't show toast - it's too noisy
+        }
+    }
 });
 
 // Handle edit node button click

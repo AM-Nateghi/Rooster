@@ -29,6 +29,15 @@ $(function () {
     }
 
     function saveToStorage() {
+        // Clean up: remove instruct field from all chunks
+        Object.keys(entriesByTopic).forEach(topic => {
+            entriesByTopic[topic].forEach(chunk => {
+                if (chunk.instruct !== undefined) {
+                    delete chunk.instruct;
+                }
+            });
+        });
+
         localStorage.setItem("entriesByTopic", JSON.stringify(entriesByTopic));
         localStorage.setItem("currentTopic", currentTopic);
         localStorage.setItem("orderCounters", JSON.stringify(orderCounters));
@@ -180,6 +189,11 @@ $(function () {
         const e = entriesByTopic[currentTopic].find(x => x.id === id);
         if (!e) return;
         $("#inputText").val(e.input).focus();
+        $("#depthInput").val(e.depth || "");
+
+        // Show order indicator
+        $("#orderIndicator").text(`#${e.order}`).removeClass("hidden");
+
         toggleActionButtons(true);
         highlightSelected();
     }
@@ -194,6 +208,8 @@ $(function () {
     function reset() {
         selectedId = null;
         $("#inputText").val("");
+        $("#depthInput").val("");
+        $("#orderIndicator").addClass("hidden"); // Hide order indicator
         toggleActionButtons(false);
         highlightSelected();
         $("#inputText").blur(); // Remove focus
@@ -205,15 +221,23 @@ $(function () {
         if (!orderCounters[currentTopic]) orderCounters[currentTopic] = 0;
         if (!entriesByTopic[currentTopic]) entriesByTopic[currentTopic] = [];
 
-        entriesByTopic[currentTopic].push({
+        const depthValue = $("#depthInput").val();
+        const newChunk = {
             id: randomId(),
             order: ++orderCounters[currentTopic],
-            instruct: "This is a default instruction.", // Default instruction
             input: text,
             output: ""
-        });
+        };
+
+        // Only add depth if it has a value and is >= 1
+        if (depthValue && parseInt(depthValue) >= 1) {
+            newChunk.depth = parseInt(depthValue);
+        }
+
+        entriesByTopic[currentTopic].push(newChunk);
 
         $("#inputText").val("");
+        $("#depthInput").val("");
         saveToStorage();
         render();
         renderTabs();
@@ -226,6 +250,15 @@ $(function () {
         const idx = entriesByTopic[currentTopic].findIndex(e => e.id === selectedId);
         if (idx > -1) {
             entriesByTopic[currentTopic][idx].input = text;
+
+            // Update depth
+            const depthValue = $("#depthInput").val();
+            if (depthValue && parseInt(depthValue) >= 1) {
+                entriesByTopic[currentTopic][idx].depth = parseInt(depthValue);
+            } else {
+                // Remove depth if empty or < 1
+                delete entriesByTopic[currentTopic][idx].depth;
+            }
         }
         saveToStorage();
         render(); // Re-render to show updated card
@@ -426,7 +459,6 @@ $(function () {
         const newChunk = {
             id: randomId(),
             order: newOrder,
-            instruct: "This is a default instruction.",
             input: "",
             output: ""
         };

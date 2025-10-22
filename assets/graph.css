@@ -110,3 +110,80 @@
     background: rgba(30, 41, 59, 0.92);
     border: 1px solid rgba(255, 255, 255, 0.15);
 }
+
+/* Depth input in tooltip - same as index page but smaller */
+#detailTooltip .depth-input-wrapper {
+    position: relative;
+    width: 80px;
+}
+
+#detailTooltip .depth-input {
+    width: 100%;
+    padding: 6px 6px 3px 6px;
+    font-size: 11px;
+    border: 1px solid rgba(100, 116, 139, 0.3);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.95);
+    color: #1e293b;
+    outline: none;
+    transition: all 0.2s ease;
+    -moz-appearance: textfield;
+}
+
+#detailTooltip .depth-input::-webkit-outer-spin-button,
+#detailTooltip .depth-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+#detailTooltip .depth-input:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+    background: rgba(255, 255, 255, 1);
+}
+
+#detailTooltip .depth-label {
+    position: absolute;
+    top: 7px;
+    right: 6px;
+    font-size: 10px;
+    color: #64748b;
+    pointer-events: none;
+    transition: all 0.2s ease;
+    background: transparent;
+    padding: 0 2px;
+}
+
+#detailTooltip .depth-input:focus + .depth-label,
+#detailTooltip .depth-input:not(:placeholder-shown) + .depth-label {
+    top: -9px;
+    right: 6px;
+    font-size: 9px;
+    color: #3b82f6;
+    background: rgba(255, 255, 255, 0.98);
+    padding: 0 3px;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.dark #detailTooltip .depth-input {
+    background: rgba(51, 65, 85, 0.95);
+    color: #e2e8f0;
+    border-color: rgba(148, 163, 184, 0.3);
+}
+
+.dark #detailTooltip .depth-input:focus {
+    border-color: #3b82f6;
+    background: rgba(51, 65, 85, 1);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.dark #detailTooltip .depth-label {
+    color: #94a3b8;
+}
+
+.dark #detailTooltip .depth-input:focus + .depth-label,
+.dark #detailTooltip .depth-input:not(:placeholder-shown) + .depth-label {
+    color: #60a5fa;
+    background: rgba(30, 41, 59, 0.98);
+}
