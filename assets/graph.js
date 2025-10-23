@@ -33,7 +33,8 @@ $("#darkToggle").on("click", function () {
 });
 
 // Link type configurations with unique 4-digit IDs starting from 3141
-const linkTypes = {
+// Load from localStorage or use defaults
+let linkTypes = JSON.parse(localStorage.getItem('linkTypes')) || {
     reference: { id: 3141, color: '#3b82f6', directed: true, width: 2 },
     'ارتباط علی': { id: 3142, color: '#8b5cf6', directed: true, width: 2.5 },
     'ادامه متن': { id: 3143, color: '#06b6d4', directed: true, width: 2 },
@@ -42,6 +43,59 @@ const linkTypes = {
     'زیرمجموعه مطلب': { id: 3146, color: '#ec4899', directed: true, width: 2.5 },
     default: { id: 3147, color: '#64748b', directed: true, width: 1.5 }
 };
+
+// Save linkTypes to localStorage
+function saveLinkTypes() {
+    localStorage.setItem('linkTypes', JSON.stringify(linkTypes));
+}
+
+// Extract and add new link types from graph connections
+function extractLinkTypesFromConnections() {
+    if (!graphConnections) return false;
+
+    let newTypesAdded = false;
+    const allTypes = new Set();
+
+    // Collect all unique link types from all connections
+    Object.values(graphConnections).forEach(connections => {
+        if (Array.isArray(connections)) {
+            connections.forEach(conn => {
+                if (conn.type && conn.type !== 'default') {
+                    allTypes.add(conn.type);
+                }
+            });
+        }
+    });
+
+    // Add missing types to linkTypes
+    allTypes.forEach(typeName => {
+        if (!linkTypes[typeName]) {
+            // Generate new ID
+            const maxId = Math.max(...Object.values(linkTypes).map(t => t.id || 3140));
+            const newId = maxId + 1;
+
+            // Generate a random color
+            const colors = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ec4899', '#ef4444', '#14b8a6'];
+            const randomColor = colors[Math.floor(Math.random() * colors.length)];
+
+            linkTypes[typeName] = {
+                id: newId,
+                color: randomColor,
+                directed: true, // Default to directed
+                width: 2
+            };
+
+            newTypesAdded = true;
+            console.log(`✅ Added new link type from connections: "${typeName}" with color ${randomColor}`);
+        }
+    });
+
+    if (newTypesAdded) {
+        saveLinkTypes();
+    }
+
+    return newTypesAdded;
+}
 
 // Node type colors
 const nodeColors = {
@@ -152,7 +206,7 @@ svg.append('defs').selectAll('marker')
         return markerId;
     })
     .attr('viewBox', '0 -5 10 10')
-    .attr('refX', 18)  // node radius (14) + stroke (2) + arrow tip (2)
+    .attr('refX', 16)  // Average node radius (14) + stroke (2)
     .attr('refY', 0)
     .attr('markerWidth', 6)
     .attr('markerHeight', 6)
@@ -179,6 +233,14 @@ function loadDataFromStorage() {
 
         if (storedConnections) {
             graphConnections = JSON.parse(storedConnections);
+        }
+
+        // Extract and add any new link types from connections
+        if (graphConnections && Object.keys(graphConnections).length > 0) {
+            const newTypesAdded = extractLinkTypesFromConnections();
+            if (newTypesAdded) {
+                console.log('🔗 New link types extracted and added from connections');
+            }
         }
 
         if (Object.keys(entriesByTopic).length > 0) {
@@ -331,6 +393,11 @@ function updateStats() {
 }
 
 function renderGraph() {
+    // Extract any new link types from current graph data
+    if (graphData.links && graphData.links.length > 0) {
+        extractLinkTypesFromConnections();
+    }
+
     // Stop previous simulation if it exists
     if (simulation) {
         // Save current positions before stopping
@@ -479,11 +546,12 @@ function renderGraph() {
 
     node.append('circle')
         .attr('r', d => {
-            // Size based on depth: 5 levels (1-5), 8px reduction per level
+            // Size based on depth: 5 levels (1-5), 5.5px reduction per level
+            // depth=1: 30px, depth=2: 24.5px, depth=3: 19px, depth=4: 13.5px, depth=5: 8px
             if (d.depth !== undefined && d.depth !== null && d.depth >= 1) {
-                const maxRadius = 45;  // depth = 1
-                const reductionPerLevel = 8;
-                const minRadius = 13;  // depth = 5+
+                const maxRadius = 30;  // depth = 1
+                const minRadius = 8;   // depth = 5
+                const reductionPerLevel = 5.5;
 
                 // Clamp depth to max 5 levels
                 const effectiveDepth = Math.min(d.depth, 5);
@@ -1110,9 +1178,9 @@ $(document).on('change blur', '.node-depth-input', async function () {
                 // Update node size directly without re-rendering entire graph
                 let newRadius;
                 if (graphNode.depth !== undefined && graphNode.depth !== null && graphNode.depth >= 1) {
-                    const maxRadius = 45;  // depth = 1
-                    const reductionPerLevel = 8;
-                    const minRadius = 13;  // depth = 5+
+                    const maxRadius = 30;  // depth = 1
+                    const minRadius = 8;   // depth = 5
+                    const reductionPerLevel = 5.5;
 
                     // Clamp depth to max 5 levels
                     const effectiveDepth = Math.min(graphNode.depth, 5);
@@ -1593,4 +1661,218 @@ loadDataFromStorage();
 // Initialize dropdowns after page load
 $(document).ready(function() {
     initializeDropdowns();
+    renderLinkTypesList();
+});
+
+// ========== Link Types Management ==========
+
+let editingLinkTypeName = null; // Track which link type is being edited
+let linkTypeDirectedState = true; // State for directed toggle
+
+// Render the list of link types in sidebar
+function renderLinkTypesList() {
+    // First, extract any new types from connections
+    extractLinkTypesFromConnections();
+
+    const $list = $('#linkTypesList');
+    $list.empty();
+
+    Object.keys(linkTypes).forEach(typeName => {
+        if (typeName === 'default') return; // Skip default type
+
+        const config = linkTypes[typeName];
+        const isUsed = isLinkTypeUsed(typeName);
+
+        const $item = $(`
+            <div class="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                <div class="w-3 h-3 rounded-full flex-shrink-0" style="background: ${config.color};"></div>
+                <span class="flex-1 text-xs font-medium text-slate-800 dark:text-slate-200 truncate">${typeName}</span>
+                <span class="text-xs text-slate-500 dark:text-slate-400">${config.directed ? '→' : '↔'}</span>
+                <button class="edit-link-type-btn text-xs hover:scale-110 transition-transform" data-type="${typeName}" title="ویرایش">
+                    ✏️
+                </button>
+                <button class="delete-link-type-btn text-xs hover:scale-110 transition-transform ${isUsed ? 'opacity-30 cursor-not-allowed' : ''}"
+                        data-type="${typeName}"
+                        title="${isUsed ? 'این نوع یال در حال استفاده است' : 'حذف'}"
+                        ${isUsed ? 'disabled' : ''}>
+                    🗑️
+                </button>
+            </div>
+        `);
+
+        $list.append($item);
+    });
+
+    // Add event handlers
+    $('.edit-link-type-btn').on('click', function() {
+        const typeName = $(this).data('type');
+        openLinkTypeEditor(typeName);
+    });
+
+    $('.delete-link-type-btn').on('click', async function() {
+        const typeName = $(this).data('type');
+        if (isLinkTypeUsed(typeName)) {
+            toast.warning('این نوع یال در حال استفاده است و نمی‌توان آن را حذف کرد');
+            return;
+        }
+
+        const confirmed = await modal.confirm(
+            `آیا از حذف نوع یال "${typeName}" مطمئن هستید؟`,
+            { title: 'تایید حذف', confirmText: 'بله، حذف کن', cancelText: 'لغو' }
+        );
+
+        if (confirmed) {
+            delete linkTypes[typeName];
+            saveLinkTypes();
+            renderLinkTypesList();
+            toast.success(`نوع یال "${typeName}" حذف شد`);
+        }
+    });
+}
+
+// Check if a link type is being used in any connections
+function isLinkTypeUsed(typeName) {
+    if (!graphConnections || !currentDocId) return false;
+    const connections = graphConnections[currentDocId] || [];
+    return connections.some(conn => conn.type === typeName);
+}
+
+// Open editor modal for adding/editing link type
+function openLinkTypeEditor(typeNameToEdit = null) {
+    editingLinkTypeName = typeNameToEdit;
+    const $modal = $('#linkTypeEditorModal');
+    const $title = $('#linkTypeEditorTitle');
+    const $nameInput = $('#linkTypeNameInput');
+    const $colorInput = $('#linkTypeColorInput');
+    const $colorHex = $('#linkTypeColorHex');
+    const $directedToggle = $('#linkTypeDirectedToggle');
+    const $dot = $directedToggle.find('span');
+
+    if (typeNameToEdit) {
+        // Editing existing type
+        $title.text('ویرایش نوع یال');
+        const config = linkTypes[typeNameToEdit];
+        $nameInput.val(typeNameToEdit).prop('disabled', true); // Can't change name when editing
+        $colorInput.val(config.color);
+        $colorHex.val(config.color);
+        linkTypeDirectedState = config.directed;
+    } else {
+        // Adding new type
+        $title.text('افزودن نوع یال جدید');
+        $nameInput.val('').prop('disabled', false);
+        $colorInput.val('#3b82f6');
+        $colorHex.val('#3b82f6');
+        linkTypeDirectedState = true;
+    }
+
+    // Update toggle visual state
+    if (linkTypeDirectedState) {
+        $directedToggle.removeClass('bg-slate-300 dark:bg-slate-600').addClass('bg-green-500');
+        $dot.addClass('-translate-x-6');
+    } else {
+        $directedToggle.removeClass('bg-green-500').addClass('bg-slate-300 dark:bg-slate-600');
+        $dot.removeClass('-translate-x-6');
+    }
+
+    $modal.removeClass('hidden');
+}
+
+// Add Link Type Button
+$('#addLinkTypeBtn').on('click', function() {
+    openLinkTypeEditor();
+});
+
+// Color picker sync
+$('#linkTypeColorInput').on('input', function() {
+    const color = $(this).val();
+    $('#linkTypeColorHex').val(color);
+});
+
+$('#linkTypeColorHex').on('input', function() {
+    const color = $(this).val();
+    if (/^#[0-9A-Fa-f]{6}$/.test(color)) {
+        $('#linkTypeColorInput').val(color);
+    }
+});
+
+// Directed toggle
+$('#linkTypeDirectedToggle').on('click', function() {
+    linkTypeDirectedState = !linkTypeDirectedState;
+    const $toggle = $(this);
+    const $dot = $toggle.find('span');
+
+    if (linkTypeDirectedState) {
+        $toggle.removeClass('bg-slate-300 dark:bg-slate-600').addClass('bg-green-500');
+        $dot.addClass('-translate-x-6');
+    } else {
+        $toggle.removeClass('bg-green-500').addClass('bg-slate-300 dark:bg-slate-600');
+        $dot.removeClass('-translate-x-6');
+    }
+});
+
+// Save link type
+$('#saveLinkType').on('click', function() {
+    const name = $('#linkTypeNameInput').val().trim();
+    const color = $('#linkTypeColorHex').val().trim();
+
+    // Validation
+    if (!name) {
+        toast.warning('لطفاً نام نوع یال را وارد کنید');
+        return;
+    }
+
+    if (!editingLinkTypeName && linkTypes[name]) {
+        toast.warning('این نام قبلاً استفاده شده است');
+        return;
+    }
+
+    if (!/^#[0-9A-Fa-f]{6}$/.test(color)) {
+        toast.warning('رنگ نامعتبر است. فرمت صحیح: #RRGGBB');
+        return;
+    }
+
+    // Generate new ID if adding new type
+    let id;
+    if (editingLinkTypeName) {
+        // Keep existing ID when editing
+        id = linkTypes[editingLinkTypeName].id;
+    } else {
+        // Generate new ID (find max ID and add 1)
+        const maxId = Math.max(...Object.values(linkTypes).map(t => t.id || 3140));
+        id = maxId + 1;
+    }
+
+    // Save or update
+    if (editingLinkTypeName && editingLinkTypeName !== name) {
+        // If name changed, we need to update all connections using this type
+        const isUsed = isLinkTypeUsed(editingLinkTypeName);
+        if (isUsed) {
+            toast.error('نمی‌توان نام نوع یالی که در حال استفاده است را تغییر داد');
+            return;
+        }
+        delete linkTypes[editingLinkTypeName];
+    }
+
+    linkTypes[name] = {
+        id: id,
+        color: color,
+        directed: linkTypeDirectedState,
+        width: 2
+    };
+
+    saveLinkTypes();
+    renderLinkTypesList();
+
+    // Refresh graph to show new colors
+    if (currentBook && currentDocId) {
+        renderGraph(currentBook, currentDocId);
+    }
+
+    $('#linkTypeEditorModal').addClass('hidden');
+    toast.success(editingLinkTypeName ? `نوع یال "${name}" ویرایش شد` : `نوع یال "${name}" اضافه شد`);
+});
+
+// Cancel link type editor
+$('#cancelLinkTypeEditor').on('click', function() {
+    $('#linkTypeEditorModal').addClass('hidden');
 });
