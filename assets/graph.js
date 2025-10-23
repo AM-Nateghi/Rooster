@@ -1058,7 +1058,7 @@ $(document).on('click', '.reverseLinkBtn', function (e) {
 });
 
 // Handle depth input change in tooltip
-$(document).on('change blur', '.node-depth-input', function () {
+$(document).on('change blur', '.node-depth-input', async function () {
     const nodeId = $(this).data('node-id');
     const book = $(this).data('book');
     const depthValue = $(this).val();
@@ -1076,6 +1076,27 @@ $(document).on('change blur', '.node-depth-input', function () {
 
             // Save to localStorage
             localStorage.setItem('entriesByTopic', JSON.stringify(entriesByTopic));
+
+            // Sync with backend automatically
+            try {
+                const orderCounters = JSON.parse(localStorage.getItem('orderCounters') || '{}');
+                const topicMeta = JSON.parse(localStorage.getItem('topicMeta') || '{}');
+                const currentTopic = localStorage.getItem('currentTopic');
+
+                await fetch('/sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        entriesByTopic,
+                        orderCounters,
+                        topicMeta,
+                        booksMeta,
+                        currentTopic
+                    })
+                });
+            } catch (err) {
+                console.error('خطا در سینک کردن depth با بک‌اند:', err);
+            }
 
             // Update the node in graphData
             const graphNode = graphData.nodes.find(n => n.id === nodeId);
@@ -1350,6 +1371,226 @@ window.addEventListener('resize', () => {
     }
 });
 
+// Node Search Functionality
+let searchDebounceTimer = null;
+
+$('#nodeSearchInput').on('input', function() {
+    const query = $(this).val().trim().toLowerCase();
+
+    // Clear previous timer
+    if (searchDebounceTimer) {
+        clearTimeout(searchDebounceTimer);
+    }
+
+    // Hide results if query is empty
+    if (!query) {
+        $('#searchResults').addClass('hidden').empty();
+        return;
+    }
+
+    // Debounce search (wait 300ms after user stops typing)
+    searchDebounceTimer = setTimeout(() => {
+        performNodeSearch(query);
+    }, 300);
+});
+
+// Click outside to close search results
+$(document).on('click', function(e) {
+    const $searchBox = $('#nodeSearchInput');
+    const $searchResults = $('#searchResults');
+
+    if (!$searchBox.is(e.target) && !$searchResults.is(e.target) && $searchResults.has(e.target).length === 0) {
+        $searchResults.addClass('hidden');
+    }
+});
+
+// Focus search input to show results again if there's a query
+$('#nodeSearchInput').on('focus', function() {
+    const query = $(this).val().trim();
+    if (query) {
+        performNodeSearch(query.toLowerCase());
+    }
+});
+
+function performNodeSearch(query) {
+    if (!graphData.nodes || graphData.nodes.length === 0) {
+        $('#searchResults').addClass('hidden').empty();
+        return;
+    }
+
+    // Get search type from dropdown
+    const searchType = searchTypeDropdown ? searchTypeDropdown.getValue() : 'all';
+
+    // Search based on selected type
+    const matches = graphData.nodes.filter(node => {
+        if (searchType === 'all') {
+            // Search in all fields
+            // 1. Check order (exact match)
+            if (node.order && node.order.toString() === query) {
+                return true;
+            }
+
+            // 2. Check ID (partial match)
+            if (node.id && node.id.toLowerCase().includes(query)) {
+                return true;
+            }
+
+            // 3. Check first 20 words of text
+            if (node.fullText) {
+                const words = node.fullText.split(/\s+/).slice(0, 20).join(' ').toLowerCase();
+                if (words.includes(query)) {
+                    return true;
+                }
+            }
+
+            return false;
+        } else if (searchType === 'order') {
+            // Search only in order (exact match)
+            return node.order && node.order.toString() === query;
+        } else if (searchType === 'id') {
+            // Search only in ID (partial match)
+            return node.id && node.id.toLowerCase().includes(query);
+        } else if (searchType === 'text') {
+            // Search only in first 20 words of text
+            if (node.fullText) {
+                const words = node.fullText.split(/\s+/).slice(0, 20).join(' ').toLowerCase();
+                return words.includes(query);
+            }
+            return false;
+        }
+
+        return false;
+    });
+
+    // Display results
+    const $results = $('#searchResults');
+    $results.empty();
+
+    if (matches.length === 0) {
+        $results.html(`
+            <div class="p-3 text-xs text-slate-500 dark:text-slate-400 text-center">
+                هیچ نودی یافت نشد
+            </div>
+        `).removeClass('hidden');
+        return;
+    }
+
+    // Limit to 10 results
+    const limitedMatches = matches.slice(0, 10);
+
+    limitedMatches.forEach(node => {
+        const preview = node.fullText ? node.fullText.slice(0, 40) + '...' : '';
+        const bookInfo = node.book ? `<span class="text-[10px] text-slate-500 dark:text-slate-400">📚 ${node.book}</span>` : '';
+
+        const $item = $(`
+            <div class="search-result-item p-2 border-b border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer transition-colors"
+                 data-node-id="${node.id}">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                        <span class="inline-block w-5 h-5 text-center rounded-full bg-blue-500 text-white text-[10px] leading-5">${node.order || '?'}</span>
+                        ${node.id.slice(0, 12)}${node.id.length > 12 ? '...' : ''}
+                    </span>
+                    ${bookInfo}
+                </div>
+                <div class="text-[10px] text-slate-600 dark:text-slate-300 leading-tight">
+                    ${preview}
+                </div>
+            </div>
+        `);
+
+        $item.on('click', function() {
+            const nodeId = $(this).data('node-id');
+            zoomToNode(nodeId);
+            $('#searchResults').addClass('hidden');
+            $('#nodeSearchInput').val('').blur();
+        });
+
+        $results.append($item);
+    });
+
+    $results.removeClass('hidden');
+}
+
+function zoomToNode(nodeId) {
+    if (!simulation || !graphData.nodes) return;
+
+    // Find the node
+    const node = simulation.nodes().find(n => n.id === nodeId);
+    if (!node) {
+        toast.error('نود یافت نشد');
+        return;
+    }
+
+    // Get current dimensions
+    const { width, height } = getGraphDimensions();
+
+    // Calculate transform to center the node
+    const scale = 1.5; // Zoom level
+    const x = width / 2 - node.x * scale;
+    const y = height / 2 - node.y * scale;
+
+    // Apply transform with smooth transition
+    svg.transition()
+        .duration(750)
+        .call(
+            zoom.transform,
+            d3.zoomIdentity.translate(x, y).scale(scale)
+        );
+
+    // Highlight the node temporarily
+    d3.selectAll('.node').each(function(d) {
+        if (d.id === nodeId) {
+            const $node = d3.select(this);
+
+            // Add highlight
+            $node.classed('highlight-node', true);
+
+            // Remove highlight after 2 seconds
+            setTimeout(() => {
+                $node.classed('highlight-node', false);
+            }, 2000);
+        }
+    });
+
+    toast.success('نود یافت شد!');
+}
+
+// Initialize dropdowns
+let searchTypeDropdown = null;
+let linkTypeDropdown = null;
+
+function initializeDropdowns() {
+    // Initialize search type dropdown
+    const searchTypeOptions = [
+        { value: 'all', label: 'همه', icon: '🔍' },
+        { value: 'order', label: 'Order', icon: '🔢' },
+        { value: 'id', label: 'آیدی', icon: '🆔' },
+        { value: 'text', label: 'متن', icon: '📝' }
+    ];
+
+    // Create placeholder element for dropdown
+    const searchTrigger = document.createElement('div');
+    document.getElementById('searchTypeDropdownTrigger').appendChild(searchTrigger);
+
+    searchTypeDropdown = window.dropdown.create(searchTrigger, searchTypeOptions, {
+        placeholder: 'همه',
+        selectedValue: 'all',
+        compact: true,
+        width: '90px',
+        onChange: (value) => {
+            const query = $('#nodeSearchInput').val().trim().toLowerCase();
+            if (query) {
+                performNodeSearch(query);
+            }
+        }
+    });
+}
+
 // Initialize
 initializeTheme();
 loadDataFromStorage();
+
+// Initialize dropdowns after page load
+$(document).ready(function() {
+    initializeDropdowns();
+});

@@ -126,6 +126,7 @@ $(function () {
             entries.sort((a, b) => b.order - a.order).forEach(e => { // Sort by order descending
                 const preview = e.input.slice(0, 30);
                 const words = getWordCount(e.input);
+                const depthBadge = e.depth && e.depth >= 1 ? `<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-purple-500 text-white ml-1">عمق ${e.depth}</span>` : '';
                 const card = $(`
                     <div class="glass-card p-3 rounded-lg cursor-pointer hover:shadow-lg transition-all relative chunk-card" data-id="${e.id}">
                         <div class="flex justify-between items-center mb-2">
@@ -135,6 +136,7 @@ $(function () {
                         <p class="text-sm text-slate-800 dark:text-slate-100 h-10 overflow-hidden text-ellipsis">${preview}</p>
                         <div class="flex justify-start items-center mt-2">
                             <span class="px-2 py-0.5 rounded-full text-xs font-bold text-white ${badgeColor(words)}">${words} کلمه</span>
+                            ${depthBadge}
                         </div>
                         <div class="chunk-insert-buttons absolute bottom-2 left-2 hidden gap-1 flex-row justify-end">
                             <button class="insert-before-btn px-1 py-1 text-xs rounded-full bg-white/80 dark:bg-slate-700/80 text-slate-700 dark:text-slate-200 transition-all active:scale-95 border border-slate-300 dark:border-slate-600" data-chunk-id="${e.id}" title="افزودن چانک قبل از این">
@@ -189,7 +191,6 @@ $(function () {
         const e = entriesByTopic[currentTopic].find(x => x.id === id);
         if (!e) return;
         $("#inputText").val(e.input).focus();
-        $("#depthInput").val(e.depth || "");
 
         // Show order indicator
         $("#orderIndicator").text(`#${e.order}`).removeClass("hidden");
@@ -208,7 +209,6 @@ $(function () {
     function reset() {
         selectedId = null;
         $("#inputText").val("");
-        $("#depthInput").val("");
         $("#orderIndicator").addClass("hidden"); // Hide order indicator
         toggleActionButtons(false);
         highlightSelected();
@@ -221,7 +221,6 @@ $(function () {
         if (!orderCounters[currentTopic]) orderCounters[currentTopic] = 0;
         if (!entriesByTopic[currentTopic]) entriesByTopic[currentTopic] = [];
 
-        const depthValue = $("#depthInput").val();
         const newChunk = {
             id: randomId(),
             order: ++orderCounters[currentTopic],
@@ -229,15 +228,9 @@ $(function () {
             output: ""
         };
 
-        // Only add depth if it has a value and is >= 1
-        if (depthValue && parseInt(depthValue) >= 1) {
-            newChunk.depth = parseInt(depthValue);
-        }
-
         entriesByTopic[currentTopic].push(newChunk);
 
         $("#inputText").val("");
-        $("#depthInput").val("");
         saveToStorage();
         render();
         renderTabs();
@@ -250,15 +243,6 @@ $(function () {
         const idx = entriesByTopic[currentTopic].findIndex(e => e.id === selectedId);
         if (idx > -1) {
             entriesByTopic[currentTopic][idx].input = text;
-
-            // Update depth
-            const depthValue = $("#depthInput").val();
-            if (depthValue && parseInt(depthValue) >= 1) {
-                entriesByTopic[currentTopic][idx].depth = parseInt(depthValue);
-            } else {
-                // Remove depth if empty or < 1
-                delete entriesByTopic[currentTopic][idx].depth;
-            }
         }
         saveToStorage();
         render(); // Re-render to show updated card

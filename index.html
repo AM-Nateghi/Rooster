@@ -23,9 +23,15 @@
     <header class="max-w-7xl mx-auto mb-4">
         <div class="glass rounded-xl p-4 shadow-md">
             <div class="flex justify-between items-center">
-                <h1 class="text-xl md:text-2xl font-bold text-slate-800 dark:text-white">
-                    📚 ساخت دیتاست JSON
-                </h1>
+                <div class="flex items-center gap-4">
+                    <h1 class="text-xl md:text-2xl font-bold text-slate-800 dark:text-white">
+                        📚 ساخت دیتاست JSON
+                    </h1>
+                    <a href="/graph"
+                       class="px-3 py-1.5 text-xs font-semibold bg-blue-500 text-white rounded-lg hover:bg-blue-600 active:scale-95 transition-all">
+                        🔗 گراف
+                    </a>
+                </div>
                 <button id="darkToggle"
                     class="glass w-10 h-10 flex items-center justify-center text-lg rounded-full hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-400">
                     <span class="dark-icon hidden">☀️</span>
@@ -62,18 +68,8 @@
         </section>
 
         <section class="mb-4 relative">
-            <!-- Order indicator (sticky top-right) -->
-            <div id="orderIndicator" class="hidden sticky top-4 float-left ml-4 mb-2 px-3 py-1 text-sm font-bold rounded-lg z-20 pointer-events-none"
-                 style="background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); color: white; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);">
-            </div>
-            <div class="absolute top-2 left-2 z-10 depth-input-wrapper">
-                <input type="number"
-                       id="depthInput"
-                       class="depth-input"
-                       placeholder=" "
-                       min="1"
-                       max="10">
-                <label for="depthInput" class="depth-label">عمق (Depth)</label>
+            <!-- Order indicator (fixed top-left with 16px margin) - styled like #order in chunk cards -->
+            <div id="orderIndicator" class="hidden fixed text-xs text-slate-500 dark:text-slate-400 font-semibold z-20 pointer-events-none" style="top: 5rem; left: 1rem;">
             </div>
             <textarea id="inputText"
                 class="w-full h-64 p-3 text-sm text-slate-800 dark:text-slate-200 bg-white/50 dark:bg-slate-800/50 border-2 border-slate-300 dark:border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none placeholder-slate-500 dark:placeholder-slate-400 transition-colors"
